@@ -1,6 +1,6 @@
 # JakeySelfBot 🤖
 
-A production-ready Discord self-bot with advanced AI integration, professional artistic image generation, and comprehensive utility tools. Jakey is the Discord degenerate mascot known for his cynical wit and uncensored personality.
+Jakey is a foul mouthed, degenerate gambling Discord chatbot that you had no idea you needed.
 
 ## About 📖
 
