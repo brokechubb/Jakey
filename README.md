@@ -1,4 +1,4 @@
-# Evil Jakey 🤖
+# Meet Jakey 🤖
 
 Jakey is a foul mouthed, degenerate gambling Discord chatbot that you had no idea you needed.
 
