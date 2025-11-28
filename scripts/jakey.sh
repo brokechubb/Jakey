@@ -143,7 +143,7 @@ monitor_bot() {
             fi
 
             echo "---"
-        } >> "bot_monitoring.log"
+        } >> "logs/bot_monitoring.log"
 
     done &
 
@@ -157,7 +157,7 @@ echo $$ > "$PID_FILE"
 # Start MCP Memory Server in background (unless skipped)
 if [[ "$SKIP_MCP" != "true" ]]; then
     print_status "Starting MCP Memory Server..."
-    nohup python tools/mcp_memory_server.py > mcp_server.log 2>&1 &
+    nohup python tools/mcp_memory_server.py > logs/mcp_server.log 2>&1 &
     MCP_PID=$!
     echo "MCP Memory Server started with PID: $MCP_PID"
 

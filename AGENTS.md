@@ -5,29 +5,17 @@ This file provides guidance to agentic coding agents working with code in this r
 ## Common Development Commands
 
 ### Running the Bot
-- **Standard startup**: `./jakey.sh` - Starts bot with MCP memory server, monitoring, and proper error handling
+- **Standard startup**: `./scripts/jakey.sh` - Starts bot with MCP memory server, monitoring, and proper error handling
 - **Direct Python**: `python main.py` - Simple startup without additional services
-- **Skip MCP server**: `./jakey.sh --skip-mcp` - Start without memory server
-
-### Testing
-- **Run all tests**: `python -m tests.test_runner` - Executes all 44 unit tests
-- **Run specific test**: `python -m tests.test_<name>` - Run individual test modules
-- **Run specific test method**: `python -m unittest tests.test_<name>.TestClassName.test_method_name`
-- **Test coverage**: Tests cover commands, database, tools, API integration, and core functionality
+- **Skip MCP server**: `./scripts/jakey.sh --skip-mcp` - Start without memory server
 
 ### MCP Memory Server
-- **Start MCP server**: `./start_mcp_server.sh` - Start memory server independently
-- **Check status**: Server creates `.mcp_port` file with dynamic port assignment
-- **Health check**: HTTP endpoint at `http://localhost:{port}/health`
-
-### Database Operations
-- **Flush database**: `python utils/flush_db.py` - Clear all data from SQLite database
-- **Database location**: `data/jakey.db` (configurable via `DATABASE_PATH` env var)
+- **Start MCP server**: `./scripts/start_mcp_server.sh` - Start memory server independently
 
 ### Service Management
-- **Systemd setup**: `./setup_systemd.sh` - Install as systemd service
-- **Service control**: `./service_control.sh` - Start/stop systemd service
-- **Status check**: `./check_status.sh` - Check bot and service status
+- **Systemd setup**: `./scripts/setup_systemd.sh` - Install as systemd service
+- **Service control**: `./scripts/service_control.sh` - Start/stop systemd service
+- **Status check**: `./scripts/check_status.sh` - Check bot and service status
 - **PM2 Management**: `pm2 start pm2-ecosystem.yml` - Production process management
 
 ## Architecture Overview

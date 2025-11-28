@@ -212,7 +212,7 @@ JakeySelfBot/
 Or use the preferred startup script:
 
 ```bash
-./jakey.sh
+./scripts/jakey.sh
 ```
 
 ## 🎮 Command System
@@ -298,11 +298,11 @@ Configurable AI memory with token limits and channel-specific context windows.
    ```
 
 3. **Run:**
-   ```bash
-   ./jakey.sh              # Full production startup
-   python main.py          # Simple development startup
-   ./jakey.sh --skip-mcp   # Without MCP memory server
-   ```
+    ```bash
+    ./scripts/jakey.sh              # Full production startup
+    python main.py                  # Simple development startup
+    ./scripts/jakey.sh --skip-mcp   # Without MCP memory server
+    ```
 
 ### Production Deployment
 
