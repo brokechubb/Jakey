@@ -1,10 +1,10 @@
 # Logging Configuration
 
-This document explains how to use the standardized logging configuration for the JakeySelfBot project.
+This document explains how to use the standardized logging configuration for the Jakey project.
 
 ## Overview
 
-The JakeySelfBot project now uses a standardized logging configuration that provides:
+The Jakey project now uses a standardized logging configuration that provides:
 
 1. Colored output for different log levels (DEBUG, INFO, WARNING, ERROR, CRITICAL)
 2. Consistent formatting with timestamps, level names, module names, and line numbers

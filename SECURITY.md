@@ -2,7 +2,7 @@
 
 ## Supported Versions
 
-Only the latest version of JakeySelfBot is supported. If you discover a security vulnerability in an older version, please upgrade to the latest version to see if the issue has already been addressed.
+Only the latest version of Jakey is supported. If you discover a security vulnerability in an older version, please upgrade to the latest version to see if the issue has already been addressed.
 
 ## Reporting a Vulnerability
 
@@ -15,7 +15,7 @@ Please do not create a public GitHub issue for security vulnerabilities.
 
 ## Security Best Practices
 
-When using JakeySelfBot, please follow these security best practices:
+When using Jakey, please follow these security best practices:
 
 ### For End Users
 
@@ -50,7 +50,7 @@ The application properly handles sensitive configuration through environment var
 
 ## Data Privacy
 
-JakeySelfBot stores data locally for functionality:
+Jakey stores data locally for functionality:
 - Conversation history is stored locally for context
 - User preferences are stored to personalize interactions
 - No data is transmitted to external servers beyond configured API endpoints

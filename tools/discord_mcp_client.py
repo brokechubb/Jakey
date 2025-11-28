@@ -1,5 +1,5 @@
 """
-Discord MCP Client for JakeySelfBot
+Discord MCP Client for Jakey
 Provides integration with discord-self-mcp server
 """
 import json

@@ -136,7 +136,7 @@ Jakey isn't just another Discord bot - he's your degenerate research assistant, 
 
 ## 🚀 Production Status
 
-[![Tests](https://img.shields.io/badge/tests-81%2F81%20passing-brightgreen)](https://github.com/brokechubb/JakeySelfBot)
+[![Tests](https://img.shields.io/badge/tests-81%2F81%20passing-brightgreen)](https://github.com/brokechubb/Jakey)
 [![Python](https://img.shields.io/badge/python-3.8+-blue)](https://www.python.org/)
 [![Discord.py-self](https://img.shields.io/badge/discord.py--self-2.0+-purple)](https://github.com/dolfies/discord.py-self)
 
@@ -152,7 +152,7 @@ Jakey isn't just another Discord bot - he's your degenerate research assistant, 
 ## 📁 Project Structure
 
 ```
-JakeySelfBot/
+Jakey/
 ├── main.py                 # Application entry point with DI container
 ├── config.py              # 70+ configuration parameters
 ├── bot/                   # Discord client & 35 command handlers
@@ -311,7 +311,7 @@ Configurable AI memory with token limits and channel-specific context windows.
 1. **Clone & Install:**
 
     ```bash
-    git clone https://github.com/brokechubb/JakeySelfBot.git
+    git clone https://github.com/brokechubb/Jakey.git
     cd JakeySelfBot
     pip install -r requirements.txt
     ```

@@ -1,7 +1,7 @@
 # MCP Memory Server Integration Roadmap
 
 ## 📋 Overview
-This roadmap outlines the integration of MCP (Model Context Protocol) memory server into JakeySelfBot to provide enhanced memory capabilities using knowledge graph storage while maintaining existing SQLite fallback.
+This roadmap outlines the integration of MCP (Model Context Protocol) memory server into Jakey to provide enhanced memory capabilities using knowledge graph storage while maintaining existing SQLite fallback.
 
 ## 🎯 Goal
 Provide Jakey with enhanced memory capabilities using MCP knowledge graph while maintaining existing SQLite fallback, without the complexity of previous MCP implementation attempts.

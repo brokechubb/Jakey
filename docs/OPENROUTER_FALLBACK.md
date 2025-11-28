@@ -2,7 +2,7 @@
 
 ## Overview
 
-JakeySelfBot now supports OpenRouter as a fallback AI provider when Pollinations AI is unavailable. This ensures the bot remains functional even during service outages.
+Jakey now supports OpenRouter as a fallback AI provider when Pollinations AI is unavailable. This ensures the bot remains functional even during service outages.
 
 ## Features
 
@@ -21,8 +21,8 @@ Add the following to your `.env` file:
 OPENROUTER_API_KEY=your_openrouter_api_key_here
 OPENROUTER_ENABLED=true
 OPENROUTER_DEFAULT_MODEL=microsoft/phi-3-medium-128k-instruct:free
-OPENROUTER_SITE_URL=https://github.com/chubbb/JakeySelfBot
-OPENROUTER_APP_NAME=JakeySelfBot
+OPENROUTER_SITE_URL=https://github.com/chubbb/Jakey
+OPENROUTER_APP_NAME=Jakey
 ```
 
 ### Getting an OpenRouter API Key

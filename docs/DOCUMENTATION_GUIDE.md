@@ -2,7 +2,7 @@
 
 ## Overview
 
-This directory contains all project documentation for JakeySelfBot. All markdown (.md) files have been organized here for better project structure.
+This directory contains all project documentation for Jakey. All markdown (.md) files have been organized here for better project structure.
 
 ## Documentation Categories
 

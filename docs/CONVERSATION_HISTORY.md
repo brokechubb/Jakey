@@ -1,6 +1,6 @@
 # Conversation History Configuration
 
-This document explains how to configure the conversation history parameters for JakeySelfBot to control how much context is used in AI responses.
+This document explains how to configure the conversation history parameters for Jakey to control how much context is used in AI responses.
 
 ## Configuration Options
 

@@ -1,6 +1,6 @@
 # Keno Number Generation Feature
 
-This document describes the new Keno number generation feature added to JakeySelfBot.
+This document describes the new Keno number generation feature added to Jakey.
 
 ## Feature Overview
 

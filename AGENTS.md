@@ -201,7 +201,7 @@ pip install -U discord.py-self  # NOT discord.py!
 ### 📁 Directory Layout
 
 ```
-JakeySelfBot/
+Jakey/
 ├── data/              # Database and data storage
 │   ├── __init__.py
 │   └── database.py

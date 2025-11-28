@@ -23,9 +23,9 @@ OPENROUTER_DEFAULT_MODEL = os.getenv(
 )
 OPENROUTER_ENABLED = os.getenv("OPENROUTER_ENABLED", "true").lower() == "true"
 OPENROUTER_SITE_URL = os.getenv(
-    "OPENROUTER_SITE_URL", "https://github.com/chubbb/JakeySelfBot"
+    "OPENROUTER_SITE_URL", "https://github.com/chubbb/Jakey"
 )
-OPENROUTER_APP_NAME = os.getenv("OPENROUTER_APP_NAME", "JakeySelfBot")
+OPENROUTER_APP_NAME = os.getenv("OPENROUTER_APP_NAME", "Jakey")
 
 # CoinMarketCap API Configuration
 COINMARKETCAP_API_KEY = os.getenv("COINMARKETCAP_API_KEY")

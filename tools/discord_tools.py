@@ -1,5 +1,5 @@
 """
-Discord Tools for JakeySelfBot
+Discord Tools for Jakey
 Provides native Discord functionality as tools that can be used by the AI
 """
 
@@ -12,7 +12,7 @@ from datetime import datetime
 logger = logging.getLogger(__name__)
 
 class DiscordTools:
-    """Native Discord tools implementation for JakeySelfBot"""
+    """Native Discord tools implementation for Jakey"""
 
     def __init__(self, bot_client: discord.Client):
         """

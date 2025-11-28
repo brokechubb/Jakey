@@ -1,8 +1,8 @@
-# JakeySelfBot - Project Summary
+# Jakey - Project Summary
 
 ## Overview
 
-JakeySelfBot is a Discord self-bot with advanced AI integration, professional artistic image generation, and comprehensive utility tools. The bot features a distinctive degenerate gambling personality and provides extensive cryptocurrency tipping, gambling utilities, and AI-powered responses.
+Jakey is a Discord self-bot with advanced AI integration, professional artistic image generation, and comprehensive utility tools. The bot features a distinctive degenerate gambling personality and provides extensive cryptocurrency tipping, gambling utilities, and AI-powered responses.
 
 ## Current Status
 

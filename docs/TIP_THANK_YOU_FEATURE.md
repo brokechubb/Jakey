@@ -202,4 +202,4 @@ When modifying this feature:
 
 ---
 
-*This feature is part of JakeySelfBot's community engagement system.*
+*This feature is part of Jakey's community engagement system.*

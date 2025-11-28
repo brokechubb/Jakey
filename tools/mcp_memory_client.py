@@ -1,5 +1,5 @@
 """
-Simple MCP Memory Client for JakeySelfBot
+Simple MCP Memory Client for Jakey
 Provides HTTP client interface to MCP Memory Server
 """
 import json

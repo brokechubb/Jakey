@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 running = True
 
 # File lock for ensuring only one instance runs
-LOCK_FILE_PATH = "/tmp/jakeyselfbot.lock"
+LOCK_FILE_PATH = "/tmp/jakey.lock"
 lock_file = None
 
 def acquire_lock():
@@ -48,7 +48,7 @@ def release_lock():
         lock_file.close()
 
 # File lock for ensuring only one instance runs
-LOCK_FILE_PATH = "/tmp/jakeyselfbot.lock"
+LOCK_FILE_PATH = "/tmp/jakey.lock"
 lock_file = None
 
 def signal_handler(signum, frame):
@@ -72,7 +72,7 @@ def main():
 
     # Acquire lock to ensure only one instance runs
     if not acquire_lock():
-        logger.warning("⚠️  Another instance of JakeySelfBot is already running!")
+        logger.warning("⚠️  Another instance of Jakey is already running!")
         sys.exit(1)
 
     # Set up signal handler to release lock on exit

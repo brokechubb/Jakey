@@ -16,7 +16,7 @@ This directory contains test scripts for various components of the Jakey bot.
 To run all tests:
 
 ```bash
-cd /path/to/JakeySelfBot
+cd /path/to/Jakey
 python -m tests.test_runner
 ```
 

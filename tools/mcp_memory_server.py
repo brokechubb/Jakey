@@ -1,5 +1,5 @@
 """
-Simple MCP Memory Server for JakeySelfBot
+Simple MCP Memory Server for Jakey
 Provides HTTP API endpoints for memory storage and retrieval
 """
 

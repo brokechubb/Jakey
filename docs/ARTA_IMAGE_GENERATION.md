@@ -2,7 +2,7 @@
 
 ## Overview
 
-Arta is an advanced image generation service that provides high-quality artistic image generation with support for multiple styles and aspect ratios. This documentation covers how Arta is integrated into the JakeySelfBot project.
+Arta is an advanced image generation service that provides high-quality artistic image generation with support for multiple styles and aspect ratios. This documentation covers how Arta is integrated into the Jakey project.
 
 ## Key Features
 
@@ -46,7 +46,7 @@ Arta uses Firebase authentication to generate tokens:
 - Status values: QUEUED, PROCESSING, DONE, FAILED
 - Returns image URLs when generation is complete
 
-## Integration in JakeySelfBot
+## Integration in Jakey
 
 ### Tool Manager Integration
 The `generate_image` tool in `tools/tool_manager.py` has been updated to use Arta:

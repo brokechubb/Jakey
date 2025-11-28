@@ -1,8 +1,8 @@
 #!/bin/bash
 
-# Check status of JakeySelfBot services
+# Check status of Jakey services
 
-echo "=== JakeySelfBot Service Status ==="
+echo "=== Jakey Service Status ==="
 echo
 
 echo "MCP Memory Server:"

@@ -1,6 +1,6 @@
 """
 Integration example for the graceful degradation system.
-Demonstrates how to integrate the degradation system with the JakeySelfBot.
+Demonstrates how to integrate the degradation system with the Jakey.
 """
 import asyncio
 import time
@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 class JakeyDegradationIntegration:
     """
-    Integration layer for graceful degradation with JakeySelfBot.
+    Integration layer for graceful degradation with Jakey.
     """
     
     def __init__(self, bot_client):
@@ -37,7 +37,7 @@ class JakeyDegradationIntegration:
             logger.warning("Graceful degradation orchestrator not available")
             return
         
-        logger.info("Initializing JakeySelfBot graceful degradation...")
+        logger.info("Initializing Jakey graceful degradation...")
         
         # Register notification callbacks
         self.orchestrator.register_notification_callback(self._on_status_change)
@@ -53,7 +53,7 @@ class JakeyDegradationIntegration:
         # Initialize the system
         await self.orchestrator.initialize()
         
-        logger.info("JakeySelfBot graceful degradation initialized")
+        logger.info("Jakey graceful degradation initialized")
     
     def _register_custom_monitors(self):
         """Register bot-specific custom monitors."""
@@ -171,7 +171,7 @@ class JakeyDegradationIntegration:
             )
             feature_manager.register_feature(config)
         
-        logger.info(f"Registered {len(all_features)} JakeySelfBot features")
+        logger.info(f"Registered {len(all_features)} Jakey features")
     
     def _create_enable_func(self, feature_name):
         """Create enable function for a feature."""
@@ -433,6 +433,6 @@ async def recover_command(ctx, integration):
 
 
 if __name__ == "__main__":
-    print("JakeySelfBot Graceful Degradation Integration")
+    print("Jakey Graceful Degradation Integration")
     print("This module demonstrates how to integrate the graceful degradation system")
-    print("with the JakeySelfBot for enhanced resilience and user experience.")
+    print("with the Jakey for enhanced resilience and user experience.")

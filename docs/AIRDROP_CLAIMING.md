@@ -1,6 +1,6 @@
 # Airdrop Claiming System
 
-JakeySelfBot includes an automated airdrop claiming system that can participate in various types of cryptocurrency drops on Discord. The system is designed to automatically detect and claim different types of airdrops from the tip.cc bot.
+Jakey includes an automated airdrop claiming system that can participate in various types of cryptocurrency drops on Discord. The system is designed to automatically detect and claim different types of airdrops from the tip.cc bot.
 
 ## Supported Drop Types
 

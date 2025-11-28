@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Setup script for JakeySelfBot systemd services
+# Setup script for Jakey systemd services
 
 set -e
 
@@ -30,13 +30,13 @@ fi
 
 # Check if we're in the right directory
 if [[ ! -f "main.py" ]]; then
-    print_error "main.py not found. Please run this script from the JakeySelfBot root directory."
+    print_error "main.py not found. Please run this script from the Jakey root directory."
     exit 1
 fi
 
 # Get the current user
 CURRENT_USER=$(whoami)
-print_status "Setting up JakeySelfBot systemd services for user: $CURRENT_USER"
+print_status "Setting up Jakey systemd services for user: $CURRENT_USER"
 
 # Create virtual environment if it doesn't exist
 if [[ ! -d "venv" ]]; then

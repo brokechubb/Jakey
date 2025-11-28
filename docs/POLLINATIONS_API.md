@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Pollinations.AI API provides free, accessible generative AI services including text generation and audio synthesis. Image generation has been replaced with the Arta API for better quality and more features. This documentation covers the API endpoints and demonstrates how to use them in the JakeySelfBot project.
+The Pollinations.AI API provides free, accessible generative AI services including text generation and audio synthesis. Image generation has been replaced with the Arta API for better quality and more features. This documentation covers the API endpoints and demonstrates how to use them in the Jakey project.
 
 ## Available Endpoints
 
@@ -171,7 +171,7 @@ Image generation now uses the Arta API with 49 artistic styles including:
 
 See ARTA_IMAGE_GENERATION.md for a complete list of available styles.
 
-## Current JakeySelfBot Implementation Status
+## Current Jakey Implementation Status
 
 ### ✅ Working Features
 - **Text Generation**: Full OpenAI-compatible POST endpoint integration
@@ -215,7 +215,7 @@ The bot is configured for **Seed tier access** with the following rate limits:
 ### Audio Voices
 - `alloy`, `echo`, `fable`, `onyx`, `nova`, `shimmer`
 
-## Integration in JakeySelfBot
+## Integration in Jakey
 
 ### Current Implementation
 

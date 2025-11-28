@@ -1,5 +1,5 @@
 #!/bin/bash
-# JakeySelfBot Startup Script
+# Jakey Startup Script
 # Standard startup with MCP memory server
 #
 # Usage: ./jakey.sh [OPTIONS]
@@ -11,14 +11,14 @@
 #   ./jakey.sh                                    # Start with MCP memory server
 #   ./jakey.sh --skip-mcp                         # Start without MCP memory server
 
-# JakeySelfBot Startup Script
+# Jakey Startup Script
 # Basic startup with MCP memory server support
 
 # Exit on any error
 set -e
 
 # PID file for ensuring only one instance runs
-PID_FILE="/tmp/jakeyselfbot.pid"
+PID_FILE="/tmp/jakey.pid"
 
 # Default configuration
 
@@ -57,7 +57,7 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         --help)
-            echo "JakeySelfBot Startup Script"
+            echo "Jakey Startup Script"
             echo ""
             echo "Usage: $0 [OPTIONS]"
             echo ""
@@ -82,7 +82,7 @@ done
 if [[ -f "$PID_FILE" ]]; then
     OLD_PID=$(cat "$PID_FILE")
     if ps -p "$OLD_PID" > /dev/null 2>&1; then
-        print_error "JakeySelfBot is already running with PID $OLD_PID"
+        print_error "Jakey is already running with PID $OLD_PID"
         exit 1
     else
         # Remove stale PID file
@@ -185,13 +185,13 @@ print_info "Startup Configuration:"
 print_info "  MCP Server: $([ "$SKIP_MCP" == "true" ] && echo "Skipped" || echo "Enabled")"
 
 # Start the bot
-print_status "Starting JakeySelfBot (PID: $$)..."
+print_status "Starting Jakey (PID: $)..."
 
 # Standard startup
 python main.py &
 BOT_PID=$!
 
-print_status "JakeySelfBot started with PID: $BOT_PID"
+print_status "Jakey started with PID: $BOT_PID"
 
 # Start bot monitoring
 monitor_bot
@@ -200,7 +200,7 @@ monitor_bot
 
 # Function to cleanup on exit
 cleanup() {
-    print_status "Shutting down JakeySelfBot..."
+    print_status "Shutting down Jakey..."
 
     # Kill bot process
     if [[ -n "$BOT_PID" ]] && kill -0 "$BOT_PID" 2>/dev/null; then
@@ -233,11 +233,11 @@ cleanup() {
         BOT_EXIT_CODE=$?
 
         if [[ $BOT_EXIT_CODE -eq 0 ]]; then
-            print_status "JakeySelfBot exited normally"
+            print_status "Jakey exited normally"
         else
-            print_error "JakeySelfBot exited with code $BOT_EXIT_CODE"
+            print_error "Jakey exited with code $BOT_EXIT_CODE"
         fi
     fi
 
     # Final cleanup message
-    print_status "JakeySelfBot shutdown complete"
+    print_status "Jakey shutdown complete"

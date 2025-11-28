@@ -1,6 +1,6 @@
 # Keno Auto-Generation Feature
 
-This document describes the automatic Keno number generation feature that has been integrated into JakeySelfBot's AI response system.
+This document describes the automatic Keno number generation feature that has been integrated into Jakey's AI response system.
 
 ## Feature Overview
 

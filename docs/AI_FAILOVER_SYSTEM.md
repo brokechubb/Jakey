@@ -376,7 +376,7 @@ Planned improvements:
 
 ## 📝 License
 
-This failover system is part of the JakeySelfBot project and follows the same licensing terms.
+This failover system is part of the Jakey project and follows the same licensing terms.
 
 ---
 

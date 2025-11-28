@@ -1,6 +1,6 @@
 # Welcome Messages Feature
 
-The JakeySelfBot now supports AI-powered welcome messages for new server members. This feature generates personalized, witty welcome messages using Jakey's degenerate gambling personality.
+The Jakey now supports AI-powered welcome messages for new server members. This feature generates personalized, witty welcome messages using Jakey's degenerate gambling personality.
 
 ## Configuration
 

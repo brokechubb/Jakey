@@ -1,5 +1,5 @@
 """
-Security Tests for JakeySelfBot
+Security Tests for Jakey
 Tests input validation and security measures across all components
 """
 

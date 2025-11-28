@@ -1,6 +1,6 @@
-# JakeySelfBot Setup Guide
+# Jakey Setup Guide
 
-This guide will help you set up JakeySelfBot for your own use with your own API keys and configuration.
+This guide will help you set up Jakey for your own use with your own API keys and configuration.
 
 ## Prerequisites
 
@@ -13,7 +13,7 @@ This guide will help you set up JakeySelfBot for your own use with your own API 
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/yourusername/JakeySelfBot.git
+git clone https://github.com/yourusername/Jakey.git
 cd JakeySelfBot
 ```
 
@@ -95,7 +95,7 @@ The bot is highly configurable through the `.env` file. Key options include:
 
 ## API Services Used
 
-JakeySelfBot uses several external APIs:
+Jakey uses several external APIs:
 
 - **Pollinations.ai**: Primary AI text/image generation
 - **OpenRouter**: Fallback AI provider
