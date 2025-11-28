@@ -1,42 +1,48 @@
 # Jakey 🤖
 
-Jakey is a foul mouthed, degenerate gambling Discord chatbot that you had no idea you needed.
+The chaotically brilliant Discord assistant that fuses enterprise-grade engineering with the razor-sharp wit of a Vegas pit boss who just blew his life savings on a hard eight. This isn’t your average chat bot—it’s a full-stack powerhouse capable of tracking your crypto portfolio down to the last satoshi, scouring the web for answers, and recalling your favorite color while roasting your life decisions with surgical precision. Built on AI and a grandma-offending attitude, Jakey is a sysadmin-approved package that somehow works.
 
-## About 📖
+## 📖 A Loopy Language Model 📖
 
-Holy shit, this project is my baby - a wild ride through full-stack development that somehow ended up being a production-ready Discord bot. I started this to learn Python and ended up building something that could probably run a small business. Here's what makes Jakey tick:
+Holy shit, this project is my baby - a wild ride through full-stack development that somehow ended up being a production-ready Discord bot. I started this to to work with Python more and ended up building something that could probably run a small business. Here's what makes Jakey tick:
 
-### 🏗️ **The Tech Stack That Could**
+### 🏗️ **Tech Stack That Could**
+
 - **Microservices Madness**: MCP memory server with HTTP APIs and fancy port magic
 - **Async Everything**: Because waiting is for losers - full async/await with aiohttp and aiosqlite
 - **Dependency Injection**: Clean architecture that doesn't suck (most of the time)
 - **Resilience Engineering**: Shit breaks? No problem - automatic failover and recovery
 
 ### 🤖 **AI That Actually Works**
+
 - **Multi-Provider AI**: Pollinations primary, OpenRouter backup - never gets stuck
 - **Art Gallery in Your Discord**: 49 artistic styles from Van Gogh to anime waifus
 - **Tool Belt**: 12 specialized tools for crypto prices, web search, math, and more
 - **Anti-Repetition Tech**: Advanced system so Jakey doesn't repeat himself like a broken record
 
 ### 🛠️ **Full-Stack Chaos**
+
 - **Backend**: Python async services, REST APIs, database wizardry
 - **Frontend**: Discord interface with 35 commands that actually work
 - **Database**: SQLite with async ops and proper data modeling
 - **APIs**: Integrated with CoinMarketCap, SearXNG, tip.cc, and more
 
 ### 🧪 **Testing That Actually Happens**
+
 - **81 Unit Tests**: Yeah, I actually wrote tests and they all pass
 - **Integration Tests**: Makes sure all the APIs talk to each other nicely
 - **MCP Memory Tests**: 10 tests just for the memory system
 - **Error Handling**: Graceful failures because crashes are embarrassing
 
 ### 🚀 **DevOps That Scales**
+
 - **Multi-Platform**: Systemd, PM2, Docker - deploy anywhere
 - **Config Management**: 70+ settings because customization is key
 - **Self-Hosted Infra**: SearXNG search, MCP memory server
 - **Production Hardening**: Rate limiting, security, backups
 
 ### 🎰 **The Fun Stuff**
+
 - **Crypto Tipping**: tip.cc integration with balance tracking
 - **Airdrop Automation**: Smart claiming system with retry logic
 - **Gambling Tools**: Keno generator, bonus schedules, financial calcs
@@ -49,6 +55,7 @@ Holy shit, this project is my baby - a wild ride through full-stack development 
 Jakey isn't just another Discord bot - he's your degenerate research assistant, financial advisor, and entertainment system all rolled into one. Here's what makes him actually useful:
 
 ### 🔍 **Research & Information Gathering**
+
 - **Web Search**: Self-hosted SearXNG integration for privacy-focused research (no Google tracking you)
 - **Real-time Data**: Live cryptocurrency prices, market data, and financial information
 - **AI-Powered Answers**: Natural language conversations with access to web search and calculation tools
@@ -56,6 +63,7 @@ Jakey isn't just another Discord bot - he's your degenerate research assistant, 
 - **Audio Generation**: Convert text to speech with multiple voice options
 
 ### 💰 **Financial & Crypto Tools**
+
 - **Live Price Tracking**: Real-time crypto prices with USD conversion
 - **tip.cc Integration**: Send/receive cryptocurrency tips with automatic balance tracking
 - **Transaction History**: Complete financial records and earnings statistics
@@ -63,6 +71,7 @@ Jakey isn't just another Discord bot - he's your degenerate research assistant, 
 - **Financial Calculations**: Built-in calculator for complex financial math
 
 ### 🎮 **Entertainment & Utility**
+
 - **Professional Art Generation**: Create stunning images in 49 artistic styles (Van Gogh, anime, fantasy, etc.)
 - **Gambling Tools**: Keno number generation, bonus schedule lookups, betting calculators
 - **Time & Date**: Global timezone support and scheduling
@@ -70,6 +79,7 @@ Jakey isn't just another Discord bot - he's your degenerate research assistant, 
 - **Memory System**: Remembers your preferences, favorite colors, and personal details
 
 ### 🤖 **AI Assistant Features**
+
 - **Contextual Conversations**: Remembers chat history for coherent discussions
 - **Tool Integration**: Uses specialized tools for accurate answers (calculations, web search, crypto data)
 - **Multi-Modal**: Text, image generation, audio synthesis, and analysis
@@ -77,6 +87,7 @@ Jakey isn't just another Discord bot - he's your degenerate research assistant, 
 - **Error Recovery**: Graceful handling of failures with helpful alternatives
 
 ### 🛠️ **Server Management**
+
 - **Reaction Roles**: Automated role assignment via emoji reactions
 - **Gender Recognition**: Smart pronoun usage based on Discord roles
 - **Admin Tools**: User management, history clearing, and server controls
@@ -88,12 +99,14 @@ Jakey isn't just another Discord bot - he's your degenerate research assistant, 
 ## ⚠️ Important Warnings
 
 ### 🤖 AI Model & Content
+
 - **Uncensored AI**: Jakey uses uncensored AI models that can generate explicit, offensive, or controversial content
 - **No Content Filtering**: Unlike mainstream AI services, Jakey has minimal content restrictions
 - **User Responsibility**: All generated content is the responsibility of the user - use discretion
 - **Degenerate Personality**: Jake's responses reflect his cynical, gambling-obsessed persona
 
 ### 🚨 Self-Bot Risks & Legal Notice
+
 **Self-botting violates Discord's Terms of Service and can result in account suspension or permanent bans.**
 
 - **Account Risks**: Using self-bots can lead to Discord account termination
@@ -155,6 +168,7 @@ JakeySelfBot/
 ## ✨ Key Features
 
 ### 🤖 AI-Powered Assistant
+
 - **Conversational AI**: Natural language chat with personality and memory
 - **Research Tools**: Web search, calculations, data analysis, and information retrieval
 - **Creative Generation**: Professional artistic images and audio synthesis
@@ -162,6 +176,7 @@ JakeySelfBot/
 - **Multi-Modal**: Text, image, and audio capabilities
 
 ### 💰 Financial & Crypto Suite
+
 - **Live Market Data**: Real-time cryptocurrency prices and market information
 - **Tipping System**: tip.cc integration for seamless crypto transactions
 - **Financial Tracking**: Balance monitoring, transaction history, and earnings analytics
@@ -169,6 +184,7 @@ JakeySelfBot/
 - **Investment Tools**: Price alerts, portfolio tracking, and market analysis
 
 ### 🛠️ Production-Ready Infrastructure
+
 - **Enterprise Architecture**: Microservices, async processing, and scalable design
 - **Reliability**: Multi-provider failover, error recovery, and health monitoring
 - **Security**: Input validation, rate limiting, and admin controls
@@ -176,6 +192,7 @@ JakeySelfBot/
 - **Deployment**: Multiple deployment options (PM2, Systemd, Docker)
 
 ### 🔧 Developer Experience
+
 - **81 Unit Tests**: Complete test coverage with integration and MCP memory tests
 - **Comprehensive Documentation**: 20+ detailed docs covering all features
 - **Multi-Platform Deployment**: Systemd, PM2, Docker support with automated scripts
@@ -219,17 +236,18 @@ Or use the preferred startup script:
 
 Jakey features 35 comprehensive commands across 8 categories, all with built-in help and error handling:
 
-| Category | Commands | Description |
-|----------|----------|-------------|
-| **Core** | 8 commands | Help, stats, ping, model management, time/date |
-| **AI & Media** | 4 commands | Image generation, audio synthesis, image analysis |
-| **Memory** | 2 commands | User preference storage, friend management |
-| **Gambling** | 7 commands | Keno, bonus schedules, airdrop status, utilities |
-| **Financial** | 3 commands | tip.cc balance tracking, transactions, statistics |
-| **Admin** | 8 commands | Tipping, airdrops, user management, history clearing |
-| **Roles** | 4 commands | Gender roles, reaction role management |
+| Category       | Commands   | Description                                          |
+| -------------- | ---------- | ---------------------------------------------------- |
+| **Core**       | 8 commands | Help, stats, ping, model management, time/date       |
+| **AI & Media** | 4 commands | Image generation, audio synthesis, image analysis    |
+| **Memory**     | 2 commands | User preference storage, friend management           |
+| **Gambling**   | 7 commands | Keno, bonus schedules, airdrop status, utilities     |
+| **Financial**  | 3 commands | tip.cc balance tracking, transactions, statistics    |
+| **Admin**      | 8 commands | Tipping, airdrops, user management, history clearing |
+| **Roles**      | 4 commands | Gender roles, reaction role management               |
 
 **Example Usage:**
+
 - `%image a beautiful sunset in van gogh style` - Generate professional artistic images
 - `%bal` - Check cryptocurrency balances with USD conversion
 - `%remember favorite_color blue` - Store user preferences
@@ -256,6 +274,7 @@ See [`config.py`](config.py) and [Configuration Guide](docs/CONFIGURATION.md) fo
 - **Audit Logging**: Complete action tracking and error reporting
 
 **Admin Setup:**
+
 ```bash
 # In .env file
 ADMIN_USER_IDS=123456789,987654321
@@ -264,20 +283,25 @@ ADMIN_USER_IDS=123456789,987654321
 ## 🧠 Advanced Systems
 
 ### MCP Memory Server
+
 HTTP-based memory service with dynamic port assignment for persistent user data storage.
 
 ### Gender Role Recognition
+
 Automatic pronoun usage based on Discord role mappings with real-time updates.
 
 ### Reaction Role System
+
 Automated role assignment through emoji reactions on designated messages.
 
 ### Conversation Context
+
 Configurable AI memory with token limits and channel-specific context windows.
 
 ## 🚀 Quick Start
 
 ### Prerequisites
+
 - Python 3.8+
 - Discord user account token
 - API keys for external services (optional)
@@ -285,17 +309,19 @@ Configurable AI memory with token limits and channel-specific context windows.
 ### Installation & Setup
 
 1. **Clone & Install:**
-   ```bash
-   git clone https://github.com/brokechubb/JakeySelfBot.git
-   cd JakeySelfBot
-   pip install -r requirements.txt
-   ```
+
+    ```bash
+    git clone https://github.com/brokechubb/JakeySelfBot.git
+    cd JakeySelfBot
+    pip install -r requirements.txt
+    ```
 
 2. **Configure:**
-   ```bash
-   cp .env.example .env
-   # Edit .env with your Discord token and API keys
-   ```
+
+    ```bash
+    cp .env.example .env
+    # Edit .env with your Discord token and API keys
+    ```
 
 3. **Run:**
     ```bash
@@ -307,12 +333,14 @@ Configurable AI memory with token limits and channel-specific context windows.
 ### Production Deployment
 
 **PM2 (Recommended):**
+
 ```bash
 pm2 start pm2-ecosystem.yml
 pm2 logs jakey-self-bot
 ```
 
 **Systemd:**
+
 ```bash
 ./setup_systemd.sh
 ./service_control.sh start
@@ -322,17 +350,21 @@ pm2 logs jakey-self-bot
 ## 🗄️ Database & Testing
 
 ### Database
+
 Async SQLite with connection pooling storing conversations, user preferences, financial transactions, and airdrop records.
 
 **Utilities:**
+
 ```bash
 python utils/flush_db.py  # Clear all database data
 ```
 
 ### Testing Suite
+
 81 comprehensive tests covering all functionality with 100% pass rate.
 
 **Run Tests:**
+
 ```bash
 python -m tests.test_runner          # All tests
 python -m tests.test_mcp_memory_integration  # MCP memory tests
@@ -344,18 +376,21 @@ python -m unittest tests.test_commands.TestCommands.test_help  # Specific test
 ## 📚 Documentation & Dependencies
 
 ### Core Dependencies
+
 - **discord.py-self**: Discord self-bot framework
 - **aiohttp**: Async HTTP client for API integrations
 - **aiosqlite**: Async SQLite database operations
 - **python-dotenv**: Environment configuration management
 
 ### External APIs
+
 - **AI**: Pollinations (primary), OpenRouter (fallback), Arta (artistic images)
 - **Financial**: CoinMarketCap (crypto prices), tip.cc (tipping)
 - **Search**: Self-hosted SearXNG instance
 - **Memory**: MCP protocol implementation
 
 ### Documentation
+
 Complete documentation suite in [`docs/`](docs/) covering all features, APIs, and configuration options.
 
 ## ⚠️ Important Notes
