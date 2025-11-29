@@ -4,7 +4,7 @@ The chaotically brilliant Discord assistant that fuses enterprise-grade engineer
 
 ## 📖 A Loopy Language Model 📖
 
-Holy shit, this project is my baby - a wild ride through full-stack development that somehow ended up being a production-ready Discord bot. I started this to to work with Python more and ended up building something that could probably run a small business. Here's what makes Jakey tick:
+Holy shit, this project is my baby - a wild ride through full-stack development that somehow ended up being a production-ready Discord bot. I started this as experiment with my Discord community and ended up building something that could probably run a small business. Here's what makes Jakey tick:
 
 ### 🏗️ **Tech Stack That Could**
 
@@ -15,7 +15,7 @@ Holy shit, this project is my baby - a wild ride through full-stack development 
 
 ### 🤖 **AI That Actually Works**
 
-- **Multi-Provider AI**: Pollinations primary, OpenRouter backup - never gets stuck
+- **Free AI Models**: Pollinations primary, OpenRouter backup - never gets stuck
 - **Art Gallery in Your Discord**: 49 artistic styles from Van Gogh to anime waifus
 - **Tool Belt**: 12 specialized tools for crypto prices, web search, math, and more
 - **Anti-Repetition Tech**: Advanced system so Jakey doesn't repeat himself like a broken record
@@ -153,7 +153,7 @@ Jakey isn't just another Discord bot - he's your degenerate research assistant, 
 
 ```
 Jakey/
-├── main.py                 # Application entry point with DI container
+├── main.py                # Application entry point with DI container
 ├── config.py              # 70+ configuration parameters
 ├── bot/                   # Discord client & 35 command handlers
 ├── ai/                    # Multi-provider AI (Pollinations + OpenRouter)
