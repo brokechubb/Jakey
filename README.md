@@ -6,7 +6,7 @@ The chaotically brilliant Discord assistant that fuses enterprise-grade engineer
 
 Holy shit, this project is my baby - a wild ride through full-stack development that somehow ended up being a production-ready Discord bot. I started this as experiment with my Discord community and ended up building something that could probably run a small business. Here's what makes Jakey tick:
 
-### 🏗️ **Tech Stack That Could**
+### 🏗️ **The Tech Stack That Could**
 
 - **Microservices Madness**: MCP memory server with HTTP APIs and fancy port magic
 - **Async Everything**: Because waiting is for losers - full async/await with aiohttp and aiosqlite
