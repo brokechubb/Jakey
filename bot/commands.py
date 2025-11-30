@@ -1498,6 +1498,15 @@ def setup_commands(bot_instance):
         response += f"• Delay Range: {AIRDROP_DELAY_MIN}-{AIRDROP_DELAY_MAX}s\n"
         response += f"• CPM: {AIRDROP_CPM_MIN}-{AIRDROP_CPM_MAX}\n"
         
+        # Show ignore thresholds
+        if AIRDROP_IGNORE_DROPS_UNDER > 0:
+            response += f"• Ignore Drops Under: ${AIRDROP_IGNORE_DROPS_UNDER:.2f}\n"
+        if AIRDROP_IGNORE_TIME_UNDER > 0:
+            response += f"• Ignore Time Under: {AIRDROP_IGNORE_TIME_UNDER:.1f}s\n"
+        if AIRDROP_IGNORE_USERS:
+            ignore_count = len([u.strip() for u in AIRDROP_IGNORE_USERS.split(",") if u.strip()])
+            response += f"• Ignore Users: {ignore_count} users\n"
+        
         # Show whitelist status
         if AIRDROP_SERVER_WHITELIST:
             whitelist_servers = [s.strip() for s in AIRDROP_SERVER_WHITELIST.split(",") if s.strip()]

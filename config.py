@@ -37,14 +37,14 @@ SEARXNG_URL = os.getenv(
 
 # Airdrop Configuration
 AIRDROP_PRESENCE = os.getenv("AIRDROP_PRESENCE", "invisible")
-AIRDROP_CPM_MIN = int(os.getenv("AIRDROP_CPM_MIN", "200"))
-AIRDROP_CPM_MAX = int(os.getenv("AIRDROP_CPM_MAX", "310"))
+AIRDROP_CPM_MIN = int(os.getenv("AIRDROP_CPM_MIN") or "200")
+AIRDROP_CPM_MAX = int(os.getenv("AIRDROP_CPM_MAX") or "310")
 AIRDROP_SMART_DELAY = os.getenv("AIRDROP_SMART_DELAY", "true").lower() == "true"
 AIRDROP_RANGE_DELAY = os.getenv("AIRDROP_RANGE_DELAY", "false").lower() == "true"
-AIRDROP_DELAY_MIN = float(os.getenv("AIRDROP_DELAY_MIN", "0.0"))
-AIRDROP_DELAY_MAX = float(os.getenv("AIRDROP_DELAY_MAX", "1.0"))
-AIRDROP_IGNORE_DROPS_UNDER = float(os.getenv("AIRDROP_IGNORE_DROPS_UNDER", "0.0"))
-AIRDROP_IGNORE_TIME_UNDER = float(os.getenv("AIRDROP_IGNORE_TIME_UNDER", "0.0"))
+AIRDROP_DELAY_MIN = float(os.getenv("AIRDROP_DELAY_MIN") or "0.0")
+AIRDROP_DELAY_MAX = float(os.getenv("AIRDROP_DELAY_MAX") or "1.0")
+AIRDROP_IGNORE_DROPS_UNDER = float(os.getenv("AIRDROP_IGNORE_DROPS_UNDER") or "0.0")
+AIRDROP_IGNORE_TIME_UNDER = float(os.getenv("AIRDROP_IGNORE_TIME_UNDER") or "0.0")
 AIRDROP_IGNORE_USERS = os.getenv("AIRDROP_IGNORE_USERS", "")
 AIRDROP_SERVER_WHITELIST = os.getenv("AIRDROP_SERVER_WHITELIST", "")
 AIRDROP_DISABLE_AIRDROP = (
@@ -72,21 +72,15 @@ MCP_MEMORY_ENABLED = os.getenv("MCP_MEMORY_ENABLED", "false").lower() == "true"
 MCP_MEMORY_SERVER_URL = None  # Will be set by client based on port file
 
 # Rate Limiting Configuration (Seed Tier: 1 req/3s = 20 req/min)
-TEXT_API_RATE_LIMIT = int(os.getenv("TEXT_API_RATE_LIMIT", "20"))  # requests per minute
-IMAGE_API_RATE_LIMIT = int(
-    os.getenv("IMAGE_API_RATE_LIMIT", "20")
-)  # requests per minute
+TEXT_API_RATE_LIMIT = int(os.getenv("TEXT_API_RATE_LIMIT") or "20")  # requests per minute
+IMAGE_API_RATE_LIMIT = int(os.getenv("IMAGE_API_RATE_LIMIT") or "20")  # requests per minute
 
 # API Timeout Configuration
-POLLINATIONS_TEXT_TIMEOUT = int(os.getenv("POLLINATIONS_TEXT_TIMEOUT", "45"))  # seconds
-POLLINATIONS_IMAGE_TIMEOUT = int(
-    os.getenv("POLLINATIONS_IMAGE_TIMEOUT", "30")
-)  # seconds
-POLLINATIONS_HEALTH_TIMEOUT = int(
-    os.getenv("POLLINATIONS_HEALTH_TIMEOUT", "10")
-)  # seconds
-OPENROUTER_TEXT_TIMEOUT = int(os.getenv("OPENROUTER_TEXT_TIMEOUT", "30"))  # seconds
-OPENROUTER_HEALTH_TIMEOUT = int(os.getenv("OPENROUTER_HEALTH_TIMEOUT", "10"))  # seconds
+POLLINATIONS_TEXT_TIMEOUT = int(os.getenv("POLLINATIONS_TEXT_TIMEOUT") or "45")  # seconds
+POLLINATIONS_IMAGE_TIMEOUT = int(os.getenv("POLLINATIONS_IMAGE_TIMEOUT") or "30")  # seconds
+POLLINATIONS_HEALTH_TIMEOUT = int(os.getenv("POLLINATIONS_HEALTH_TIMEOUT") or "10")  # seconds
+OPENROUTER_TEXT_TIMEOUT = int(os.getenv("OPENROUTER_TEXT_TIMEOUT") or "30")  # seconds
+OPENROUTER_HEALTH_TIMEOUT = int(os.getenv("OPENROUTER_HEALTH_TIMEOUT") or "10")  # seconds
 
 # Timeout Performance Monitoring
 TIMEOUT_MONITORING_ENABLED = (

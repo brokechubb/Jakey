@@ -786,6 +786,93 @@ class JakeyBot(commands.Bot):
         if should_respond:
             await self.process_jakey_response(message)
 
+    async def process_jakey_response(self, message):
+        """Process Jakey's AI response to a message."""
+        try:
+            # Import here to avoid circular imports
+            from ai.ai_provider_manager import SimpleAIProviderManager
+            
+            # Initialize AI provider manager if not already done
+            if not hasattr(self, '_ai_manager'):
+                self._ai_manager = SimpleAIProviderManager()
+            
+            # Prepare the message for AI processing
+            user_content = message.content.strip()
+            if not user_content:
+                return  # Don't respond to empty messages
+            
+            messages = [
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": user_content}
+            ]
+            
+            # Add conversation context if available
+            try:
+                from data.database import db
+                conversation_history = await db.aget_recent_conversations(str(message.author.id), limit=3)
+                for entry in conversation_history:
+                    user_msg = entry.get('user_message', '').strip()
+                    bot_msg = entry.get('bot_response', '').strip()
+                    
+                    # Only add non-empty messages to avoid API errors
+                    if user_msg:
+                        messages.append({"role": "user", "content": user_msg})
+                    if bot_msg:
+                        messages.append({"role": "assistant", "content": bot_msg})
+            except Exception as e:
+                logger.debug(f"Could not load conversation history: {e}")
+            
+            # Validate messages before sending to AI
+            valid_messages = []
+            for msg in messages:
+                content = msg.get('content', '').strip()
+                if content:  # Only include non-empty messages
+                    valid_messages.append(msg)
+            
+            if len(valid_messages) < 2:  # Need at least system + user message
+                logger.debug("Not enough valid messages for AI response")
+                return
+            
+            # Generate AI response
+            response = await self._ai_manager.generate_text(
+                messages=valid_messages,
+                temperature=0.7,
+                max_tokens=500
+            )
+            
+            if response.get('error'):
+                logger.error(f"AI generation error: {response['error']}")
+                await message.channel.send("💀 **Sorry, I'm having trouble thinking right now. Try again later.**")
+                return
+            
+            ai_response = response.get('content', '').strip()
+            if not ai_response:
+                await message.channel.send("💀 **My mind went blank. Try again?**")
+                return
+            
+            # Check for repetition
+            is_repetitive, repetition_info = self._is_repetitive_response(str(message.author.id), ai_response)
+            if is_repetitive:
+                logger.debug(f"Repetition detected: {repetition_info}")
+                ai_response = self._generate_non_repetitive_response(message.content, ai_response)
+            
+            # Send the response
+            async with message.channel.typing():
+                await asyncio.sleep(len(ai_response) / 200)  # Typing simulation
+            await message.channel.send(ai_response)
+            
+            # Store the interaction
+            try:
+                from data.database import db
+                await db.aadd_conversation(str(message.author.id), message.content, ai_response)
+                self._store_user_response(str(message.author.id), ai_response)
+            except Exception as e:
+                logger.debug(f"Could not store conversation: {e}")
+                
+        except Exception as e:
+            logger.error(f"Error in process_jakey_response: {e}")
+            await message.channel.send("💀 **Something went wrong while processing your message.**")
+
     async def process_webhook_relay(self, message):
         """Process webhook relay for incoming messages"""
         try:
@@ -925,6 +1012,7 @@ class JakeyBot(commands.Bot):
                 # Wait a bit before continuing to avoid rapid error loops
                 await asyncio.sleep(60)
 
+    async def process_airdrop_command(self, original_message):
         """Process airdrop commands automatically"""
         content = original_message.content.lower()
 
@@ -985,6 +1073,18 @@ class JakeyBot(commands.Bot):
         drop_ends_in = (
             (embed.timestamp.timestamp() - time.time()) if embed.timestamp else 5
         )
+
+        # Check if drop expires too soon
+        if AIRDROP_IGNORE_TIME_UNDER > 0 and drop_ends_in < AIRDROP_IGNORE_TIME_UNDER:
+            logger.debug(f"Ignoring drop with only {drop_ends_in:.1f}s remaining (threshold: {AIRDROP_IGNORE_TIME_UNDER}s)")
+            return
+
+        # Check if drop value is too low (extract from description if available)
+        if AIRDROP_IGNORE_DROPS_UNDER > 0:
+            drop_value = self._extract_drop_value(embed)
+            if drop_value is not None and drop_value < AIRDROP_IGNORE_DROPS_UNDER:
+                logger.debug(f"Ignoring drop worth ${drop_value:.2f} (threshold: ${AIRDROP_IGNORE_DROPS_UNDER:.2f})")
+                return
 
         # Apply delay logic
         await self.maybe_delay(drop_ends_in)
@@ -1257,6 +1357,59 @@ class JakeyBot(commands.Bot):
         if delay > 0:
             logger.debug(f"Waiting {round(delay, 2)}s before acting...")
             await asyncio.sleep(delay)
+
+    def _extract_drop_value(self, embed) -> Optional[float]:
+        """Extract drop value from tip.cc embed."""
+        import re
+        
+        try:
+            # Check embed description for value patterns
+            if embed.description:
+                # Look for patterns like "$0.50", "0.50 USD", "50 cents", etc.
+                patterns = [
+                    r'\$(\d+\.?\d*)',  # $0.50
+                    r'(\d+\.?\d*)\s*USD',  # 0.50 USD
+                    r'(\d+\.?\d*)\s*dollar',  # 0.50 dollar
+                    r'(\d+)\s*cent',  # 50 cents
+                ]
+                
+                for pattern in patterns:
+                    match = re.search(pattern, embed.description, re.IGNORECASE)
+                    if match:
+                        value = float(match.group(1))
+                        # Convert cents to dollars if needed
+                        if 'cent' in pattern.lower() and value > 1:
+                            value = value / 100
+                        return value
+            
+            # Check embed title for value patterns
+            if embed.title:
+                title_patterns = [
+                    r'\$(\d+\.?\d*)',
+                    r'(\d+\.?\d*)\s*USD',
+                ]
+                
+                for pattern in title_patterns:
+                    match = re.search(pattern, embed.title, re.IGNORECASE)
+                    if match:
+                        return float(match.group(1))
+            
+            # Check embed fields if available
+            if hasattr(embed, 'fields') and embed.fields:
+                for field in embed.fields:
+                    if field.name and 'value' in field.name.lower():
+                        # Look for value in the field value
+                        if field.value:
+                            patterns = [r'\$(\d+\.?\d*)', r'(\d+\.?\d*)\s*USD']
+                            for pattern in patterns:
+                                match = re.search(pattern, field.value, re.IGNORECASE)
+                                if match:
+                                    return float(match.group(1))
+        
+        except Exception as e:
+            logger.debug(f"Error extracting drop value: {e}")
+        
+        return None
 
     async def on_member_join(self, member):
         """Handle new member joining a server - send welcome message if enabled."""
