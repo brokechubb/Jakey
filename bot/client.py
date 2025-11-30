@@ -2484,19 +2484,24 @@ class JakeyBot(commands.Bot):
                     # Add timeout handling and retry logic for button clicks
                     for attempt in range(3):  # Retry up to 3 times
                         try:
-                            await asyncio.wait_for(button.click(), timeout=10.0)
-                            await asyncio.sleep(3)
-                            await original_message.channel.send("beep boop beep...")
-                            logger.info(
-                                f"Entered airdrop in {original_message.channel.name}"
-                            )
-                            break  # Success, exit retry loop
+                            # Validate button is still clickable before attempting
+                            if not button.disabled:
+                                await asyncio.wait_for(button.click(), timeout=5.0)
+                                await asyncio.sleep(2)
+                                await original_message.channel.send("beep boop beep...")
+                                logger.info(
+                                    f"Entered airdrop in {original_message.channel.name}"
+                                )
+                                # Success inside if block
+                            else:
+                                logger.warning("Airdrop button is disabled, drop may have expired")
+                            break  # Success or disabled, exit retry loop
                         except asyncio.TimeoutError:
                             logger.warning(
                                 f"Timeout clicking airdrop button (attempt {attempt + 1}/3)"
                             )
                             if attempt < 2:  # Don't sleep on the last attempt
-                                await asyncio.sleep(2**attempt)  # Exponential backoff
+                                await asyncio.sleep(1)  # Reduced backoff time
                         except discord.HTTPException as e:
                             logger.error(f"HTTP error clicking airdrop button: {e}")
                             break  # Don't retry on HTTP errors
@@ -2505,7 +2510,7 @@ class JakeyBot(commands.Bot):
                                 f"Client error clicking airdrop button (likely timeout): {e}"
                             )
                             if attempt < 2:  # Don't sleep on the last attempt
-                                await asyncio.sleep(2**attempt)  # Exponential backoff
+                                await asyncio.sleep(1)  # Reduced backoff time
                         except Exception as e:
                             logger.error(
                                 f"Unexpected error clicking airdrop button: {e}"
@@ -2834,19 +2839,23 @@ class JakeyBot(commands.Bot):
                     # Add timeout handling and retry logic for button clicks
                     for attempt in range(3):  # Retry up to 3 times
                         try:
-                            await asyncio.wait_for(button.click(), timeout=10.0)
-                            await asyncio.sleep(3)
+                            # Validate button is still clickable before attempting
+                            if not button.disabled:
+                                await asyncio.wait_for(button.click(), timeout=5.0)
+                                await asyncio.sleep(2)
                             await original_message.channel.send("beep boop beep...")
                             logger.info(
                                 f"Entered airdrop in {original_message.channel.name}"
                             )
                             break  # Success, exit retry loop
+                            # else:
+                            logger.warning("Airdrop button is disabled, drop may have expired")  # Commented out - misplaced else
                         except asyncio.TimeoutError:
                             logger.warning(
                                 f"Timeout clicking airdrop button (attempt {attempt + 1}/3)"
                             )
                             if attempt < 2:  # Don't sleep on the last attempt
-                                await asyncio.sleep(2**attempt)  # Exponential backoff
+                                await asyncio.sleep(1)  # Reduced backoff time
                         except discord.HTTPException as e:
                             logger.error(f"HTTP error clicking airdrop button: {e}")
                             break  # Don't retry on HTTP errors
@@ -2855,7 +2864,7 @@ class JakeyBot(commands.Bot):
                                 f"Client error clicking airdrop button (likely timeout): {e}"
                             )
                             if attempt < 2:  # Don't sleep on the last attempt
-                                await asyncio.sleep(2**attempt)  # Exponential backoff
+                                await asyncio.sleep(1)  # Reduced backoff time
                         except Exception as e:
                             logger.error(
                                 f"Unexpected error clicking airdrop button: {e}"
@@ -3080,7 +3089,9 @@ class JakeyBot(commands.Bot):
     async def maybe_delay(self, drop_ends_in: float):
         """Handle smart/range/manual delay before acting."""
         if AIRDROP_SMART_DELAY:
-            delay = drop_ends_in / 4 if drop_ends_in > 0 else 0
+            # More conservative delay - wait for 1/5 of remaining time, but max 3 seconds
+            # Also ensure we don't wait longer than the drop duration minus a safety margin
+            delay = min(drop_ends_in / 5, 3.0) if drop_ends_in > 2 else 0
         elif AIRDROP_RANGE_DELAY:
             delay = uniform(AIRDROP_DELAY_MIN, AIRDROP_DELAY_MAX)
         else:
