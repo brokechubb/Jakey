@@ -997,9 +997,9 @@ class JakeyBot(commands.Bot):
                 from data.database import db
 
                 await db.aadd_conversation(
-                    str(message.author.id), 
-                    [{"user": message.content, "assistant": ai_response}], 
-                    str(message.channel.id)
+                    str(message.author.id),
+                    [{"user": message.content, "assistant": ai_response}],
+                    str(message.channel.id),
                 )
                 self._store_user_response(str(message.author.id), ai_response)
 
@@ -1467,7 +1467,9 @@ class JakeyBot(commands.Bot):
                                                 f"Trivia Answer: {answer}"
                                             )
                                         except Exception as e:
-                                            logger.error(f"Failed to announce trivia answer: {e}")
+                                            logger.error(
+                                                f"Failed to announce trivia answer: {e}"
+                                            )
                                         return  # Success, exit function
                                     except Exception as e:
                                         logger.debug(
@@ -1579,7 +1581,9 @@ class JakeyBot(commands.Bot):
                                                                     f"Trivia Answer: {unquote(a).strip()}"
                                                                 )
                                                             except Exception as e:
-                                                                logger.error(f"Failed to announce trivia answer: {e}")
+                                                                logger.error(
+                                                                    f"Failed to announce trivia answer: {e}"
+                                                                )
                                                             return  # Success, exit function
                                                         except asyncio.TimeoutError:
                                                             logger.warning(
@@ -2309,7 +2313,7 @@ class JakeyBot(commands.Bot):
 **🎰 GAMBLING & FUN COMMANDS:**
 `%rigged` - Classic Jakey response
 `%wen <item>` - Get bonus schedule information
-`%keno` - Generate random Keno numbers (3-10 numbers from 1-40)
+`%keno [count]` - Generate random Keno numbers (1-10 numbers from 1-40, optional count parameter)
 `%ind_addr` - Generate a random Indian name and address
 
 **💰 TIP.CC COMMANDS:**
@@ -2329,7 +2333,7 @@ class JakeyBot(commands.Bot):
 **💥 EXAMPLES:**
 `%time` - Current time in UTC
 `%time est` - Current time in US Eastern
-`%keno` - Generate your lucky Keno numbers
+`%keno [count]` - Generate your lucky Keno numbers (optional count 1-10)
 `%image Fantasy Art a degenerate gambler at a casino`
 
 *🔄 Processed via Jakey's Message Queue System*"""
@@ -2980,12 +2984,30 @@ class JakeyBot(commands.Bot):
                     )
 
             elif command_name == "keno":
-                # Generate random Keno numbers (3-10 numbers from 1-40) with 8x5 visual board
+                # Generate random Keno numbers (1-10 numbers from 1-40) with 8x5 visual board
                 try:
                     import random
 
-                    # Generate a random count between 3 and 10
-                    count = random.randint(3, 10)
+                    # Parse count parameter
+                    if len(args) > 0:
+                        try:
+                            count = int(args[0])
+                            # Validate count is between 1 and 10
+                            if not (1 <= count <= 10):
+                                await self._safe_send_message(
+                                    channel,
+                                    "❌ Please provide a count between 1 and 10!",
+                                )
+                                return
+                        except ValueError:
+                            await self._safe_send_message(
+                                channel,
+                                "❌ Please provide a valid number between 1 and 10!",
+                            )
+                            return
+                    else:
+                        # Generate a random count between 3 and 10 if not provided
+                        count = random.randint(3, 10)
 
                     # Generate random numbers from 1-40 without duplicates
                     numbers = random.sample(range(1, 41), count)

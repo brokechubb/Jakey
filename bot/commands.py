@@ -245,7 +245,7 @@ def setup_commands(bot):
  **🎰 GAMBLING & FUN COMMANDS:**
  `%rigged` - Classic Jakey response
  `%wen <item>` - Get bonus schedule information (monthly, stake, shuffle, payout)
- `%keno` - Generate random Keno numbers (3-10 numbers from 1-40) with visual board
+ `%keno [count]` - Generate random Keno numbers (1-10 numbers from 1-40, optional count parameter) with visual board
  `%ind_addr` - Generate a random Indian name and address
 
  **🎨 AI & MEDIA COMMANDS:**
@@ -262,7 +262,7 @@ def setup_commands(bot):
  `%time est` - Current time in US Eastern
  `%time Europe/London` - Current time in London
  `%remember favorite_team Dallas Cowboys`
- `%keno` - Generate your lucky Keno numbers
+ `%keno [count]` - Generate your lucky Keno numbers (optional count 1-10)
  `%image Fantasy Art a degenerate gambler at a casino`
  `%image 16:9 cinematic a slot machine winning big`
  `%analyze https://example.com/image.jpg What is in this image?`
@@ -1355,7 +1355,9 @@ def setup_commands(bot):
             if user and user != ctx.author:
                 # Check if user is admin
                 if not is_admin(ctx.author.id):
-                    await ctx.send("💀 Admin only command bro! You can only clear your own history.")
+                    await ctx.send(
+                        "💀 Admin only command bro! You can only clear your own history."
+                    )
                     return
 
             # Clear the user's history
@@ -1742,8 +1744,13 @@ def setup_commands(bot):
         await ctx.send(response)
 
     @bot.command(name="keno")
-    async def keno(ctx):
-        """Generate random Keno numbers (3-10 numbers from 1-40) with 8x5 visual board"""
+    async def keno(ctx, count: int = None):
+        """Generate random Keno numbers (1-10 numbers from 1-40) with 8x5 visual board
+
+        Usage: %keno [count]
+        - count: Optional number between 1-10 specifying how many numbers to generate
+        - If not provided, generates a random count between 3-10
+        """
         import random
 
         try:
@@ -1756,8 +1763,14 @@ def setup_commands(bot):
             pass
 
         try:
-            # Generate a random count between 3 and 10
-            count = random.randint(3, 10)
+            # Validate count parameter
+            if count is not None:
+                if not (1 <= count <= 10):
+                    await ctx.send("❌ Please provide a count between 1 and 10!")
+                    return
+            else:
+                # Generate a random count between 3 and 10 if not provided
+                count = random.randint(3, 10)
 
             # Generate random numbers from 1-40 without duplicates
             numbers = random.sample(range(1, 41), count)
@@ -2359,13 +2372,17 @@ def setup_commands(bot):
             stats_message += (
                 f"📥 **Total Tips Received**: ${stats['total_received_usd']:.2f}\n"
             )
-            
+
             # Check if the enhanced stats with airdrop spending are available
-            if 'total_airdrop_spent_usd' in stats:
+            if "total_airdrop_spent_usd" in stats:
                 stats_message += f"💸 **Total Airdrops Spent**: ${stats['total_airdrop_spent_usd']:.2f}\n"
-                stats_message += f"💰 **Net Profit**: ${stats['net_profit_usd']:.2f}\n\n"
+                stats_message += (
+                    f"💰 **Net Profit**: ${stats['net_profit_usd']:.2f}\n\n"
+                )
             else:
-                stats_message += f"💰 **Net Profit**: ${stats['net_profit_usd']:.2f}\n\n"
+                stats_message += (
+                    f"💰 **Net Profit**: ${stats['net_profit_usd']:.2f}\n\n"
+                )
 
             # Show transaction counts
             stats_message += "**Transaction Counts:**\n"
@@ -2394,15 +2411,17 @@ def setup_commands(bot):
             if success:
                 # Also clear balances to start completely fresh
                 balances_cleared = await bot.db.aclear_balances()
-                
+
                 await ctx.send(
                     "✅ **Tip.cc transaction history cleared!**\n"
                     "📊 All tipstats and transactions have been reset to zero.\n"
                     "💰 Balances have also been cleared for a fresh start."
                 )
             else:
-                await ctx.send("💀 **Failed to clear transaction history.** Check logs for details.")
-                
+                await ctx.send(
+                    "💀 **Failed to clear transaction history.** Check logs for details."
+                )
+
         except Exception as e:
             await ctx.send(handle_command_error(e, ctx, "clearstats"))
 

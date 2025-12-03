@@ -52,6 +52,7 @@ class ToolManager:
             "calculate": self.calculate,
             "get_current_time": self.get_current_time,
             "remember_user_mcp": self.remember_user_mcp,
+            "generate_keno_numbers": self.generate_keno_numbers,
             # Discord tools
             "discord_get_user_info": self.discord_get_user_info,
             "discord_list_guilds": self.discord_list_guilds,
@@ -820,6 +821,24 @@ class ToolManager:
             {
                 "type": "function",
                 "function": {
+                    "name": "generate_keno_numbers",
+                    "description": "Generate random Keno numbers (1-10 numbers from 1-40) with 8x5 visual board",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "count": {
+                                "type": "integer",
+                                "description": "Optional number between 1-10 specifying how many numbers to generate",
+                                "minimum": 1,
+                                "maximum": 10,
+                            }
+                        },
+                    },
+                },
+            },
+            {
+                "type": "function",
+                "function": {
                     "name": "reset_user_rate_limits",
                     "description": "Reset rate limits and penalties for a specific user (admin function)",
                     "parameters": {
@@ -847,12 +866,15 @@ class ToolManager:
 
         try:
             # Check if unified memory backend is enabled (migration complete)
-            migration_flag = os.path.join(os.path.dirname(os.path.dirname(__file__)), '.memory_migration_complete')
+            migration_flag = os.path.join(
+                os.path.dirname(os.path.dirname(__file__)), ".memory_migration_complete"
+            )
             if os.path.exists(migration_flag):
                 try:
                     # Dynamic import to avoid circular dependencies
                     import importlib
-                    memory_module = importlib.import_module('memory')
+
+                    memory_module = importlib.import_module("memory")
                     memory_backend = memory_module.memory_backend
 
                     if memory_backend is not None:
@@ -879,11 +901,16 @@ class ToolManager:
                         if success:
                             return f"Got it! I'll remember that {information_type}: {information}"
                         else:
-                            return "Sorry, I couldn't remember that information right now."
+                            return (
+                                "Sorry, I couldn't remember that information right now."
+                            )
                 except (ImportError, AttributeError) as e:
                     # Log but don't fail - fall back to legacy system
                     import logging
-                    logging.getLogger(__name__).warning(f"Unified memory backend unavailable: {e}")
+
+                    logging.getLogger(__name__).warning(
+                        f"Unified memory backend unavailable: {e}"
+                    )
 
             # Fallback to direct database access (legacy system)
             from data.database import db
@@ -962,18 +989,23 @@ class ToolManager:
         import concurrent.futures
 
         # Check if unified memory backend is enabled (migration complete)
-        migration_flag = os.path.join(os.path.dirname(os.path.dirname(__file__)), '.memory_migration_complete')
+        migration_flag = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)), ".memory_migration_complete"
+        )
         if os.path.exists(migration_flag):
             try:
                 # Dynamic import to avoid circular dependencies
                 import importlib
-                memory_module = importlib.import_module('memory')
+
+                memory_module = importlib.import_module("memory")
                 memory_backend = memory_module.memory_backend
 
                 if memory_backend is not None:
                     # Use unified memory backend
                     async def _search_memory():
-                        results = await memory_backend.search(user_id, query or None, limit=5)
+                        results = await memory_backend.search(
+                            user_id, query or None, limit=5
+                        )
                         return results
 
                     # Run the async operation
@@ -995,17 +1027,23 @@ class ToolManager:
                         value = entry.value
                         formatted_memories.append(f"• {key}: {value}")
 
-                    return f"Found memories for user {user_id} (unified):\n" + "\n".join(
-                        formatted_memories
+                    return (
+                        f"Found memories for user {user_id} (unified):\n"
+                        + "\n".join(formatted_memories)
                     )
             except (ImportError, AttributeError) as e:
                 # Log but don't fail - fall back to legacy system
                 import logging
-                logging.getLogger(__name__).warning(f"Unified memory backend unavailable for search: {e}")
+
+                logging.getLogger(__name__).warning(
+                    f"Unified memory backend unavailable for search: {e}"
+                )
 
         # Fallback to legacy MCP system
         if not MCP_MEMORY_ENABLED:
-            return "Memory search not available. Use remember_user_info for local storage."
+            return (
+                "Memory search not available. Use remember_user_info for local storage."
+            )
 
         try:
             # Import MCP memory client
@@ -1238,10 +1276,9 @@ class ToolManager:
                             for result_div in result_divs[:7]:  # Limit to top 7 results
                                 try:
                                     # Extract title (updated for article structure)
-                                    title_elem = (
-                                        result_div.find("h3")
-                                        or result_div.find("h4")
-                                    )
+                                    title_elem = result_div.find(
+                                        "h3"
+                                    ) or result_div.find("h4")
                                     if title_elem:
                                         title_link = title_elem.find("a")
                                         title = (
@@ -1257,7 +1294,9 @@ class ToolManager:
                                     url = url_elem["href"] if url_elem else ""
 
                                     # Extract content/description (updated for article structure)
-                                    content_elem = result_div.find("p", class_="content")
+                                    content_elem = result_div.find(
+                                        "p", class_="content"
+                                    )
                                     if not content_elem:
                                         content_elem = result_div.find("p")
                                     content = (
@@ -2238,6 +2277,58 @@ class ToolManager:
             return f"Error executing {tool_name}: Parameter mismatch - {str(e)}"
         except Exception as e:
             return f"Error executing {tool_name}: {str(e)}"
+
+    def generate_keno_numbers(self, count: int = None) -> str:
+        """Generate random Keno numbers (1-10 numbers from 1-40) with visual board
+
+        Args:
+            count: Optional number between 1-10 specifying how many numbers to generate
+
+        Returns:
+            Formatted string with Keno numbers and visual board
+        """
+        import random
+
+        # Validate count parameter
+        if count is not None:
+            if not (1 <= count <= 10):
+                return "❌ Please provide a count between 1 and 10!"
+        else:
+            # Generate a random count between 3 and 10 if not provided
+            count = random.randint(3, 10)
+
+        # Generate random numbers from 1-40 without duplicates
+        numbers = random.sample(range(1, 41), count)
+
+        # Sort the numbers for better readability
+        numbers.sort()
+
+        # Create the response
+        response = f"**🎯 Keno Number Generator**\n"
+        response += f"Generated **{count}** numbers for you!\n\n"
+
+        # Add the numbers
+        response += f"**Your Keno Numbers:**\n"
+        response += f"`{', '.join(map(str, numbers))}`\n\n"
+
+        # Create visual representation (8 columns x 5 rows) with clean spacing
+        visual_lines = []
+        for row in range(0, 40, 8):
+            line = ""
+            for i in range(row + 1, min(row + 9, 41)):
+                if i in numbers:
+                    # Bracketed numbers with consistent spacing
+                    line += f"[{i:2d}] "
+                else:
+                    # Regular numbers with consistent spacing
+                    line += f" {i:2d}  "
+            visual_lines.append(line.rstrip())
+
+        response += "**Visual Board:**\n"
+        response += "```\n" + "\n".join(visual_lines) + "\n```"
+        response += "\n*Numbers in brackets are your picks!*"
+
+        return response
 
 
 # Async helper functions for MCP operations
