@@ -1764,16 +1764,18 @@ class ToolManager:
             # Parse and validate trigger_time (support multiple formats)
             try:
                 import datetime
-                
+
                 # Try to parse various time formats
                 parsed_time = None
-                
+
                 # Try ISO 8601 format first
                 try:
-                    parsed_time = datetime.datetime.fromisoformat(trigger_time.replace("Z", "+00:00"))
+                    parsed_time = datetime.datetime.fromisoformat(
+                        trigger_time.replace("Z", "+00:00")
+                    )
                 except ValueError:
                     pass
-                
+
                 # Try time formats like "12:15PM", "3:30 PM", etc.
                 if not parsed_time:
                     try:
@@ -1782,13 +1784,15 @@ class ToolManager:
                         parsed_time = datetime.datetime.strptime(time_str, "%I:%M%p")
                         # Set to today's date
                         now = datetime.datetime.now()
-                        parsed_time = parsed_time.replace(year=now.year, month=now.month, day=now.day)
+                        parsed_time = parsed_time.replace(
+                            year=now.year, month=now.month, day=now.day
+                        )
                         # If time is in the past, set to tomorrow
                         if parsed_time <= now:
                             parsed_time += datetime.timedelta(days=1)
                     except ValueError:
                         pass
-                
+
                 # Try time formats like "12:15", "15:30", etc.
                 if not parsed_time:
                     try:
@@ -1798,19 +1802,21 @@ class ToolManager:
                             if len(time_parts) == 2:
                                 hour, minute = int(time_parts[0]), int(time_parts[1])
                                 now = datetime.datetime.now()
-                                parsed_time = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+                                parsed_time = now.replace(
+                                    hour=hour, minute=minute, second=0, microsecond=0
+                                )
                                 # If time is in the past, set to tomorrow
                                 if parsed_time <= now:
                                     parsed_time += datetime.timedelta(days=1)
                     except (ValueError, IndexError):
                         pass
-                
+
                 if not parsed_time:
                     raise ValueError(f"Could not parse time format: {trigger_time}")
-                
+
                 # Convert to ISO 8601 format for storage
                 trigger_time = parsed_time.isoformat()
-                
+
             except ValueError as e:
                 return f"Invalid trigger_time format: {trigger_time}. Please use formats like '12:15PM', '15:30', or '2025-10-03T15:00:00Z'"
 
@@ -2306,10 +2312,10 @@ class ToolManager:
         # These tools should always use the real user ID from the message context, not what the AI provides
         user_id_override_tools = [
             "set_reminder",
-            "list_reminders", 
+            "list_reminders",
             "cancel_reminder",
             "remember_user_info",
-            "search_user_memory"
+            "search_user_memory",
         ]
         if tool_name in user_id_override_tools:
             mapped_arguments["user_id"] = user_id
@@ -2326,6 +2332,17 @@ class ToolManager:
 
         try:
             tool_func = self.tools[tool_name]
+
+            # For image generation, use thread pool to avoid blocking the event loop
+            if tool_name == "generate_image":
+                import asyncio
+                import functools
+
+                loop = asyncio.get_event_loop()
+                # Use functools.partial to handle keyword arguments properly
+                partial_func = functools.partial(tool_func, **mapped_arguments)
+                return await loop.run_in_executor(None, partial_func)
+
             # Check if the function is a coroutine function
             import asyncio
 
