@@ -107,6 +107,7 @@ Jakey isn't just another Discord bot - he's your research assistant, financial a
 - [Database & Testing 🗄️](#️-database--testing)
 - [Documentation & Dependencies 📚](#-documentation--dependencies)
 - [Contributing 🤝](#-contributing-)
+- [Donations 💰](#-donations)
 - [License 📄](#-license)
 
 ## 🚀 Production Status
@@ -416,6 +417,27 @@ For more information about GPLv3, visit [https://www.gnu.org/licenses/gpl-3.0](h
 Have questions, found a bug, or want to share feedback? Head over to our [GitHub Discussions](https://github.com/brokechubb/Jakey/discussions) to connect with the community and developers!
 
 Don't forget to ⭐ star the project if you find it useful - it helps others discover Jakey and keeps the motivation high!
+
+## 💰 Donations
+
+If you find Jakey useful and want to support continued development, consider buying me a coffee with crypto! Every little bit helps keep the project alive and add new features.
+
+**SOL (Solana):**
+```
+FVDejAWbUGsgnziRvFi4eGkJZuH6xuLviuTdi2g4Ut3o
+```
+
+**LTC (Litecoin):**
+```
+ltc1qlace3x54t6ktzsvv7jr59xknrj5twvp99w2sze
+```
+
+**BTC (Bitcoin):**
+```
+bc1q526y8dz3utguacc3d4rrk4xjecg9kl4e9etex0
+```
+
+Thank you for your support! 🎰💎
 
 ---
 
