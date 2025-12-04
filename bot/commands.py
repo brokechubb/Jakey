@@ -1744,7 +1744,7 @@ def setup_commands(bot):
         await ctx.send(response)
 
     @bot.command(name="keno")
-    async def keno(ctx, count: int = None):
+    async def keno(ctx, count: Optional[int] = None):
         """Generate random Keno numbers (1-10 numbers from 1-40) with 8x5 visual board
 
         Usage: %keno [count]

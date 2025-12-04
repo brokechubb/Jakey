@@ -15,11 +15,12 @@ The Memory System is designed to provide personalized experiences by remembering
 
 ## How It Works
 
-The memory system operates on two levels:
+The memory system operates on two levels with unified backend support:
 
 1. **Automatic Integration**: Stored memories are automatically included in the system prompt for context
 2. **Tool-based Storage**: The AI can use the `remember_user_info` tool to store new information
 3. **Manual Storage**: Users can use the `%remember` command to store information
+4. **Unified Backend**: Automatic failover between SQLite and MCP memory servers for reliability
 
 ## Usage
 
@@ -50,6 +51,9 @@ The AI can automatically choose to use the remember_user_info tool when it ident
 
 ## Memory Storage
 
+The memory system uses a unified backend architecture with automatic failover:
+
+### Primary Backend: SQLite
 Memories are stored in the SQLite database in the `memories` table with the following structure:
 
 - `user_id`: Discord user ID
@@ -57,12 +61,23 @@ Memories are stored in the SQLite database in the `memories` table with the foll
 - `value`: The stored information (e.g., "Dallas Cowboys")
 - `created_at`: Timestamp of when the memory was created
 
+### Secondary Backend: MCP Memory Server (Optional)
+When enabled, memories are also stored in an external MCP memory server for enhanced persistence and cross-session availability.
+
+### Automatic Failover
+- The system automatically switches between backends if one becomes unavailable
+- Data is synchronized across backends when possible
+- Graceful degradation ensures memory functionality continues even if one backend fails
+
 ## Features
 
 - **Persistence**: Memories are stored in the database and persist across sessions
 - **User-specific**: Each user has their own memory space
 - **Automatic Context**: Memories are automatically included in conversation context
 - **Rate Limiting**: Prevents abuse of the memory storage system
+- **Unified Backend**: Automatic failover between storage systems
+- **Cross-Session Availability**: MCP server provides enhanced memory persistence
+- **Data Synchronization**: Memories are kept consistent across backends
 
 ## Best Practices
 

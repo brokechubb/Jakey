@@ -39,6 +39,11 @@ The airdrop system can be configured through environment variables in your `.env
 - `AIRDROP_CPM_MIN` (default: 200) - Minimum characters per minute for typing simulation
 - `AIRDROP_CPM_MAX` (default: 310) - Maximum characters per minute for typing simulation
 
+### Phrase Sanitization
+- `PHRASE_SANITIZE_ENABLED` (default: true) - Enable phrase sanitization for phrasedrops
+- Automatically removes invisible Unicode characters and formatting that can cause "no copy and pasting" rejections
+- Normalizes text to prevent detection of copied phrases
+
 ## How It Works
 
 1. **Server Filtering**: Checks if the server is in the whitelist (if configured)
@@ -46,8 +51,9 @@ The airdrop system can be configured through environment variables in your `.env
 3. **Response Waiting**: It waits for the tip.cc bot to respond with the actual drop message (up to 15 seconds)
 4. **Delay Application**: Applies configured delays before claiming (smart, range, or fixed)
 5. **Claim Execution**: Automatically claims the drop using appropriate methods:
-   - Button clicks for standard airdrops and red packets
-   - Automated responses for phrase, math, and trivia drops
+    - Button clicks for standard airdrops and red packets
+    - Automated responses for phrase, math, and trivia drops
+    - Phrase sanitization for phrasedrops to avoid copy/paste detection
 6. **Retry Logic**: Implements retry logic with exponential backoff for failed interactions
 
 ## Error Handling

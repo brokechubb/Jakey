@@ -10,11 +10,14 @@ The `%keno` command generates random Keno numbers for gambling enthusiasts. Keno
 
 ### Usage
 ```
-%keno
+%keno [count]
 ```
 
+**Parameters:**
+- `count` (optional): Number of Keno numbers to generate (3-10). If not specified, generates a random count.
+
 ### Functionality
-- Generates 3-10 random numbers (random count each time)
+- Generates 3-10 random numbers (random count if not specified, or user-specified count)
 - Numbers are selected from range 1-40 without duplicates
 - Results are sorted in ascending order for readability
 - Includes a visual board representation showing selected numbers

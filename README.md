@@ -1,10 +1,15 @@
 # Jakey 🤖
 
-The chaotically brilliant Discord assistant that fuses enterprise-grade engineering with the razor-sharp wit of a Vegas pit boss who just blew his life savings on a hard eight. This isn’t your average chat bot—it’s a full-stack powerhouse capable of tracking your crypto portfolio down to the last satoshi, scouring the web for answers, and recalling your favorite color while roasting your life decisions with surgical precision. Built on AI and a grandma-offending attitude, Jakey is a sysadmin-approved package that somehow works.
+[![Tests](https://img.shields.io/badge/tests-81%2F81%20passing-brightgreen)](https://github.com/brokechubb/Jakey)
+[![Python](https://img.shields.io/badge/python-3.8+-blue)](https://www.python.org/)
+[![Discord.py-self](https://img.shields.io/badge/discord.py--self-2.0+-purple)](https://github.com/dolfies/discord.py-self)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+
+The chaotically brilliant Discord assistant that fuses enterprise-grade engineering with sharp wit. This isn't your average chat bot—it's a full-stack powerhouse capable of tracking your crypto portfolio, scouring the web for answers, and recalling your preferences while providing insightful responses. Built on AI and a bold personality, Jakey is a production-ready package that actually works.
 
 ## 📖 A Loopy Language Model 📖
 
-Holy shit, this project is my baby - a wild ride through full-stack development that somehow ended up being a production-ready Discord bot. I started this as experiment with my Discord community and ended up building something that could probably run a small business. Here's what makes Jakey tick:
+This project is my passion project - a journey through full-stack development that resulted in a production-ready Discord bot. I started this as an experiment with my Discord community and ended up building something that could run a small business. Here's what makes Jakey tick:
 
 ### 🏗️ **The Tech Stack That Could**
 
@@ -44,57 +49,25 @@ Holy shit, this project is my baby - a wild ride through full-stack development 
 ### 🎰 **The Fun Stuff**
 
 - **Crypto Tipping**: tip.cc integration with balance tracking
-- **Airdrop Automation**: Smart claiming system with server whitelist support and retry logic
+- **Airdrop Automation**: Smart claiming system with server whitelist support, retry logic, and trivia auto-answering
 - **Gambling Tools**: Keno generator, bonus schedules, financial calcs
 - **Memory System**: Remembers your shit so conversations make sense
 
-**Bottom line**: Jakey proves enterprise-level shit can be built while keeping it innovative and fun. Everything is rigged, but the code works! 🎰💩
+**Bottom line**: Jakey proves enterprise-level software can be built while keeping it innovative and fun. Everything is designed for reliability, but the code works! 🎰
 
 ## 🎯 What Jakey Can Do For You
 
-Jakey isn't just another Discord bot - he's your degenerate research assistant, financial advisor, and entertainment system all rolled into one. Here's what makes him actually useful:
+Jakey isn't just another Discord bot - he's your research assistant, financial advisor, and entertainment system all in one. He excels at:
 
-### 🔍 **Research & Information Gathering**
+- **🔍 Research & Info**: Web search, crypto prices, AI conversations, image analysis, and audio generation
+- **💰 Finance & Crypto**: Live price tracking, tip.cc integration, transaction history, airdrop automation, and financial calculations
+- **🎮 Entertainment**: Professional art generation (49 styles), gambling tools, time/date features, random generators, and persistent memory
+- **🤖 AI Features**: Contextual conversations, tool integration, multi-modal capabilities, and error recovery
+- **🛠️ Server Management**: Reaction roles, gender recognition, admin tools, webhook relays, and channel analytics
 
-- **Web Search**: Self-hosted SearXNG integration for privacy-focused research (no Google tracking you)
-- **Real-time Data**: Live cryptocurrency prices, market data, and financial information
-- **AI-Powered Answers**: Natural language conversations with access to web search and calculation tools
-- **Image Analysis**: Upload images and get detailed descriptions and analysis
-- **Audio Generation**: Convert text to speech with multiple voice options
+**In short**: Jakey transforms your Discord server into a research lab, financial dashboard, entertainment center, and AI assistant. 🎰🔍💰
 
-### 💰 **Financial & Crypto Tools**
-
-- **Live Price Tracking**: Real-time crypto prices with USD conversion
-- **tip.cc Integration**: Send/receive cryptocurrency tips with automatic balance tracking
-- **Transaction History**: Complete financial records and earnings statistics
-- **Airdrop Automation**: Smart claiming system for crypto giveaways with retry logic
-- **Financial Calculations**: Built-in calculator for complex financial math
-
-### 🎮 **Entertainment & Utility**
-
-- **Professional Art Generation**: Create stunning images in 49 artistic styles (Van Gogh, anime, fantasy, etc.)
-- **Gambling Tools**: Keno number generation, bonus schedule lookups, betting calculators
-- **Time & Date**: Global timezone support and scheduling
-- **Random Generators**: Fictional Indian names/addresses, conversation starters, and more
-- **Memory System**: Remembers your preferences, favorite colors, and personal details from conversation
-
-### 🤖 **AI Assistant Features**
-
-- **Contextual Conversations**: Remembers chat history persistently for coherent discussions
-- **Tool Integration**: Uses specialized tools for accurate answers (calculations, web search, crypto data)
-- **Multi-Modal**: Text, image generation, audio synthesis, and analysis
-- **Personality-Driven**: Cynical wit with an over the top gambling degenerate persona
-- **Error Recovery**: Graceful handling of failures with helpful alternatives
-
-### 🛠️ **Server Management**
-
-- **Reaction Roles**: Automated role assignment via emoji reactions
-- **Gender Recognition**: Smart pronoun usage based on Discord roles
-- **Admin Tools**: User management, history clearing, and server controls
-- **Webhook Relays**: Cross-server message forwarding
-- **Channel Statistics**: Conversation analytics and activity tracking
-
-**In short**: Jakey turns your Discord server into a research lab, financial dashboard, entertainment center, and AI assistant - all while keeping you entertained with his degenerate personality. 🎰🔍💰
+*See [Key Features](#-key-features) below for detailed technical specifications.*
 
 ## ⚠️ Important Warnings
 
@@ -120,7 +93,7 @@ Jakey isn't just another Discord bot - he's your degenerate research assistant, 
 
 ## 📋 Table of Contents
 
-- [About 📖](#about-)
+- [About 📖](#-a-loopy-language-model-)
 - [What Jakey Can Do For You 🎯](#-what-jakey-can-do-for-you)
 - [Important Warnings ⚠️](#️-important-warnings)
 - [Production Status 🚀](#-production-status)
@@ -133,12 +106,10 @@ Jakey isn't just another Discord bot - he's your degenerate research assistant, 
 - [Quick Start 🚀](#-quick-start)
 - [Database & Testing 🗄️](#️-database--testing)
 - [Documentation & Dependencies 📚](#-documentation--dependencies)
+- [Contributing 🤝](#-contributing-)
+- [License 📄](#-license)
 
 ## 🚀 Production Status
-
-[![Tests](https://img.shields.io/badge/tests-81%2F81%20passing-brightgreen)](https://github.com/brokechubb/Jakey)
-[![Python](https://img.shields.io/badge/python-3.8+-blue)](https://www.python.org/)
-[![Discord.py-self](https://img.shields.io/badge/discord.py--self-2.0+-purple)](https://github.com/dolfies/discord.py-self)
 
 - **✅ Tests**: 81/81 passing (including 10 MCP integration tests)
 - **🎯 Commands**: 35 registered and functional across 8 categories
@@ -180,7 +151,7 @@ Jakey/
 - **Live Market Data**: Real-time cryptocurrency prices and market information
 - **Tipping System**: tip.cc integration for seamless crypto transactions
 - **Financial Tracking**: Balance monitoring, transaction history, and earnings analytics
-- **Airdrop Automation**: Intelligent claiming with retry logic and success tracking
+- **Airdrop Automation**: Intelligent claiming with retry logic, success tracking, and trivia auto-answering
 - **Investment Tools**: Price alerts, portfolio tracking, and market analysis
 
 ### 🛠️ Production-Ready Infrastructure
@@ -198,38 +169,54 @@ Jakey/
 - **Multi-Platform Deployment**: Systemd, PM2, Docker support with automated scripts
 - **Configuration Management**: 70+ environment variables with sensible defaults
 
-## Setup
+## 🚀 Quick Start
 
-1. Create a virtual environment:
+### Prerequisites
 
-    ```bash
-    python -m venv venv
-    ```
+- Python 3.8+
+- Discord user account token
+- API keys for external services (optional)
 
-2. Activate the virtual environment:
+### Installation & Setup
 
-    ```bash
-    source venv/bin/activate  # Linux/Mac
-    venv\Scripts\activate     # Windows
-    ```
-
-3. Install dependencies:
+1. **Clone & Install:**
 
     ```bash
+    git clone https://github.com/brokechubb/Jakey.git
+    cd JakeySelfBot
     pip install -r requirements.txt
     ```
 
-4. Configure the bot by editing `.env` file with your Discord token and other settings.
+2. **Configure:**
 
-5. Run the bot:
     ```bash
-    python main.py
+    cp .env.example .env
+    # Edit .env with your Discord token and API keys
     ```
 
-Or use the preferred startup script:
+3. **Run:**
+
+    ```bash
+    ./scripts/jakey.sh              # Full production startup (recommended)
+    python main.py                  # Simple development startup
+    ./scripts/jakey.sh --skip-mcp   # Without MCP memory server
+    ```
+
+### Production Deployment
+
+**PM2 (Recommended):**
 
 ```bash
-./scripts/jakey.sh
+pm2 start pm2-ecosystem.yml
+pm2 logs jakey-self-bot
+```
+
+**Systemd:**
+
+```bash
+./setup_systemd.sh
+./service_control.sh start
+./check_status.sh
 ```
 
 ## 🎮 Command System
@@ -241,7 +228,7 @@ Jakey features 35 comprehensive commands across 8 categories, all with built-in 
 | **Core**       | 8 commands | Help, stats, ping, model management, time/date       |
 | **AI & Media** | 4 commands | Image generation, audio synthesis, image analysis    |
 | **Memory**     | 2 commands | User preference storage, friend management           |
-| **Gambling**   | 7 commands | Keno, bonus schedules, airdrop status, utilities     |
+| **Gambling**   | 10 commands | Keno, bonus schedules, airdrop status, trivia, utilities |
 | **Financial**  | 3 commands | tip.cc balance tracking, transactions, statistics    |
 | **Admin**      | 8 commands | Tipping, airdrops, user management, history clearing |
 | **Roles**      | 4 commands | Gender roles, reaction role management               |
@@ -251,7 +238,9 @@ Jakey features 35 comprehensive commands across 8 categories, all with built-in 
 - `%image a beautiful sunset in van gogh style` - Generate professional artistic images
 - `%bal` - Check cryptocurrency balances with USD conversion (admin only)
 - `%remember favorite_color blue` - Store user preferences
-- `%keno` - Generate random Keno numbers with visual board
+- `%keno [count]` - Generate random Keno numbers with visual board (optional count 3-10)
+- `%triviastats` - Show trivia database statistics and health
+- `%clearstats` - Clear all tip.cc transaction history (admin only)
 
 ## ⚙️ Configuration
 
@@ -393,6 +382,12 @@ python -m unittest tests.test_commands.TestCommands.test_help  # Specific test
 
 Complete documentation suite in [`docs/`](docs/) covering all features, APIs, and configuration options.
 
+## 🤝 Contributing
+
+We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details on how to get started.
+
+For bugs, features, or questions, use [GitHub Discussions](https://github.com/brokechubb/Jakey/discussions).
+
 ## ⚠️ Important Notes
 
 - **CRITICAL**: Uses `discord.py-self` (NOT regular `discord.py`) - never add `intents=` parameter
@@ -416,11 +411,17 @@ This project is licensed under the GNU General Public License v3.0. See the [LIC
 
 For more information about GPLv3, visit [https://www.gnu.org/licenses/gpl-3.0](https://www.gnu.org/licenses/gpl-3.0)
 
+## 📞 Support & Feedback
+
+Have questions, found a bug, or want to share feedback? Head over to our [GitHub Discussions](https://github.com/brokechubb/Jakey/discussions) to connect with the community and developers!
+
+Don't forget to ⭐ star the project if you find it useful - it helps others discover Jakey and keeps the motivation high!
+
 ---
 
 ## 🙏 Acknowledgment
 
-This project takes inspiration from the original [JakeyBot](https://github.com/zavocc/JakeyBot) by [zavocc](https://github.com/zavocc). While this implementation is built from the ground up with completely different architecture and features, we acknowledge that the name "Jakey" and the general concept of an AI-powered Discord assistant originated from that project. The Jakey Self-Bot project has evolved into a distinct implementation with self-botting capabilities, MCP memory systems, and advanced tool integration that differ significantly from the original.
+This project takes inspiration from the original [JakeyBot](https://github.com/zavocc/JakeyBot) by [zavocc](https://github.com/zavocc). While this implementation is built from the ground up with completely different architecture and features, I acknowledge that the name "Jakey" and the general concept of an AI-powered Discord assistant originated from that project. The Jakey Self-Bot project has evolved into a distinct implementation with self-botting capabilities, MCP memory systems, and advanced tool integration that differ significantly from the original.
 
 ---
 

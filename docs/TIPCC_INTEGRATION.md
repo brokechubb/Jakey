@@ -63,6 +63,14 @@ Enhanced database integration for comprehensive tracking:
     - Net profit/loss calculation
     - Transaction volume statistics
 
+#### `%clearstats` (Admin Only)
+
+- **Function**: Clear all tip.cc transaction history and stats
+- **Features**:
+    - Resets all transaction records to zero
+    - Clears balance history for a fresh start
+    - Admin-only command for data management
+
 ### 4. Admin Commands
 
 #### `%tip <recipient> <amount> <currency> [message]` (Admin Only)
