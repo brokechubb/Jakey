@@ -28,6 +28,9 @@ from ai.response_uniqueness import response_uniqueness
 # Import admin check function
 from bot.commands import is_admin
 
+# Import phrase sanitization utilities
+from utils.phrase_sanitizer import clean_phrase_comprehensive
+
 
 # Error handling functions
 def sanitize_error_message(error_message: str) -> str:
@@ -1365,16 +1368,20 @@ class JakeyBot(commands.Bot):
                             )
                             break  # Don't retry on unexpected errors
 
-            # Phrase drop
+# Phrase drop
             elif (
                 "phrase drop" in embed.title.lower() and not AIRDROP_DISABLE_PHRASEDROP
             ):
-                phrase = embed.description.replace("\n", "").replace("**", "")
-                phrase = phrase.split("*")[1].strip()
-                async with original_message.channel.typing():
-                    await asyncio.sleep(self.typing_delay(phrase))
-                await original_message.channel.send(phrase)
-                logger.info(f"Entered phrase drop in {original_message.channel.name}")
+                phrase = clean_phrase_comprehensive(embed.description)
+                if phrase:
+                    async with original_message.channel.typing():
+                        await asyncio.sleep(self.typing_delay(phrase))
+                    await original_message.channel.send(phrase)
+                    logger.info(f"Entered phrase drop in {original_message.channel.name}")
+                else:
+                    logger.warning(f"Failed to extract phrase from embed: {embed.description}")
+                else:
+                    logger.warning(f"Failed to extract phrase from embed: {embed.description}")
 
             # Math drop
             elif "math" in embed.title.lower() and not AIRDROP_DISABLE_MATHDROP:
