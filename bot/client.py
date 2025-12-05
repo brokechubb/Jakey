@@ -46,24 +46,35 @@ def sanitize_error_message(error_message: str) -> str:
         "[DATABASE]",
         sanitized,
     )
-    sanitized = re.sub(r"\b[A-Za-z0-9]{20,}\b", "[KEY]", sanitized)
-    sanitized = re.sub(
-        r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b", "[EMAIL]", sanitized
-    )
-    sanitized = re.sub(r"\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b", "[IP]", sanitized)
-    sanitized = re.sub(r"https?://[^\s]+", "[URL]", sanitized)
-    sanitized = re.sub(
-        r"Traceback \(most recent call last\):.*?$",
-        "",
-        sanitized,
-        flags=re.MULTILINE | re.DOTALL,
-    )
-    sanitized = re.sub(r"\s+", " ", sanitized).strip()
 
-    if len(sanitized) > 200:
-        sanitized = sanitized[:197] + "..."
 
-    return sanitized or "Sanitized error message"
+def sanitize_ai_response(response: str) -> str:
+    """
+    Remove leaked tool call syntax from AI responses before sending to Discord.
+    
+    Some AI models output raw tool call syntax like [TOOL_CALLS]function{...} 
+    instead of using proper API tool call format. This strips that text.
+    """
+    if not response:
+        return response
+    
+    import re
+    
+    # Remove [TOOL_CALLS] or similar patterns followed by function calls
+    # Pattern matches: [TOOL_CALLS]function_name{...} or [TOOL_CALL]function_name{...}
+    sanitized = re.sub(r'\[TOOL_CALL[S]?\].*', '', response, flags=re.DOTALL | re.IGNORECASE)
+    
+    # Also handle other common formats like <tool_call>, </s>, etc.
+    sanitized = re.sub(r'</?tool_call>.*', '', sanitized, flags=re.DOTALL | re.IGNORECASE)
+    sanitized = re.sub(r'</?function_call>.*', '', sanitized, flags=re.DOTALL | re.IGNORECASE)
+    
+    # Remove trailing </s> tokens some models add
+    sanitized = re.sub(r'</s>\s*$', '', sanitized)
+    
+    # Clean up any trailing whitespace
+    sanitized = sanitized.strip()
+    
+    return sanitized
 
 
 def handle_command_error(error: Exception, ctx, command_name: str) -> str:
@@ -987,6 +998,14 @@ class JakeyBot(commands.Bot):
                 ai_response = self._generate_non_repetitive_response(
                     message.content, ai_response
                 )
+
+            # Sanitize response to remove any leaked tool call syntax
+            ai_response = sanitize_ai_response(ai_response)
+            
+            if not ai_response:
+                # Response was only tool call syntax with no actual message
+                logger.debug("AI response was empty after sanitization (contained only tool call syntax)")
+                return
 
             # Send the response with typing indicator (no artificial delay)
             async with message.channel.typing():
