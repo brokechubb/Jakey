@@ -1,30 +1,31 @@
 # Jakey Self-Bot - Discord AI Assistant
 # Copyright (C) 2025 brokechubb
-# 
+#
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-# 
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-# 
+#
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-from config import DISCORD_TOKEN
-from bot.client import JakeyBot
-from utils.dependency_container import init_dependencies
-from utils.logging_config import setup_logging
-import traceback
 import asyncio
-import signal
-import sys
-import os
 import fcntl
 import logging
+import os
+import signal
+import sys
+import traceback
+
+from bot.client import JakeyBot
+from config import DISCORD_TOKEN
+from utils.dependency_container import init_dependencies
+from utils.logging_config import setup_logging
 
 # Set up colored logging with file output
 setup_logging("INFO", log_to_file=True, log_file_path="logs/jakey_selfbot.log")
@@ -39,11 +40,12 @@ running = True
 LOCK_FILE_PATH = "/tmp/jakey.lock"
 lock_file = None
 
+
 def acquire_lock():
     """Acquire a lock file to ensure only one instance runs"""
     global lock_file
     try:
-        lock_file = open(LOCK_FILE_PATH, 'w')
+        lock_file = open(LOCK_FILE_PATH, "w")
         fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         lock_file.write(str(os.getpid()))
         lock_file.flush()
@@ -52,6 +54,7 @@ def acquire_lock():
         if lock_file:
             lock_file.close()
         return False
+
 
 def release_lock():
     """Release the lock file"""
@@ -63,9 +66,6 @@ def release_lock():
             pass
         lock_file.close()
 
-# File lock for ensuring only one instance runs
-LOCK_FILE_PATH = "/tmp/jakey.lock"
-lock_file = None
 
 def signal_handler(signum, frame):
     """Handle shutdown signals gracefully"""
@@ -75,17 +75,19 @@ def signal_handler(signum, frame):
     except Exception:
         # Logger might be shutting down, ignore errors
         pass
-    
+
     running = False
     # Release the lock file
     release_lock()
     # The bot will be stopped gracefully in the main loop
     sys.exit(0)
 
+
 def setup_signal_handlers():
     """Set up signal handlers for graceful shutdown"""
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
+
 
 def main():
     """Main entry point with improved error handling and reconnection"""
@@ -117,9 +119,12 @@ def main():
     if MCP_MEMORY_ENABLED:
         mcp_server_url = get_mcp_server_url()
         import aiohttp
+
         async def check_mcp_server():
             try:
-                async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=5)) as session:
+                async with aiohttp.ClientSession(
+                    timeout=aiohttp.ClientTimeout(total=5)
+                ) as session:
                     async with session.get(f"{mcp_server_url}/health") as response:
                         return response.status == 200
             except Exception:
@@ -135,8 +140,12 @@ def main():
             if mcp_available:
                 logger.info("✅ MCP Memory Server is accessible")
             else:
-                logger.warning(f"⚠️  MCP Memory Server not accessible at {mcp_server_url}")
-                logger.info("💡 Run './start_mcp_server.sh' to start the MCP server, or set MCP_MEMORY_ENABLED=false")
+                logger.warning(
+                    f"⚠️  MCP Memory Server not accessible at {mcp_server_url}"
+                )
+                logger.info(
+                    "💡 Run './start_mcp_server.sh' to start the MCP server, or set MCP_MEMORY_ENABLED=false"
+                )
         except Exception as e:
             logger.warning(f"⚠️  Could not check MCP Memory Server: {e}")
 
@@ -150,16 +159,19 @@ def main():
 
         # Initialize TipCCManager with bot instance after bot is created
         from utils.tipcc_manager import init_tipcc_manager
+
         tipcc_manager = init_tipcc_manager(bot)
         bot.tipcc_manager = tipcc_manager
         deps.tipcc_manager = tipcc_manager
 
         # Initialize Discord tools with bot client
         from tools.tool_manager import tool_manager
+
         tool_manager.set_discord_tools(bot)
 
         # Set up message queue initialization flag for bot to use in on_ready
         from config import MESSAGE_QUEUE_ENABLED
+
         bot._message_queue_enabled = MESSAGE_QUEUE_ENABLED
 
         logger.info("Dependencies initialized")
@@ -197,7 +209,9 @@ def main():
 
             # Handle specific connection errors
             if "cannot write to closing transport" in error_msg:
-                logger.warning("⚠️  Discord connection reset detected - this is usually temporary")
+                logger.warning(
+                    "⚠️  Discord connection reset detected - this is usually temporary"
+                )
                 logger.info(f"⏳ Reconnecting in {reconnect_delay:.2f} seconds...")
             elif "4014" in str(e):
                 logger.error("💀 Authentication failed - check your DISCORD_TOKEN!")
@@ -232,6 +246,7 @@ def main():
     finally:
         release_lock()
         loop.close()
+
 
 if __name__ == "__main__":
     main()
