@@ -4,9 +4,12 @@ Test suite for anti-repetition system.
 This test suite validates the response uniqueness functionality including:
 - Exact duplicate detection
 - High similarity detection
-- Internal repetition detection
 - Alternative response generation
 - User isolation
+
+NOTE: Internal repetition detection was disabled because it was flagging
+normal word usage within single responses. The system now focuses on
+detecting when the bot repeats previous responses across messages.
 """
 
 import unittest
@@ -18,7 +21,6 @@ class TestAntiRepetition(unittest.TestCase):
 
     def setUp(self):
         """Set up test environment before each test."""
-        # Clear any existing test data
         response_uniqueness.user_responses.clear()
         response_uniqueness.response_hashes.clear()
 
@@ -75,11 +77,11 @@ class TestAntiRepetition(unittest.TestCase):
         self.assertTrue(is_repetitive)
         self.assertEqual(reason, "Exact duplicate of recent response")
 
+    @unittest.skip("Internal repetition detection was intentionally disabled - it was flagging normal word usage within single responses")
     def test_internal_word_repetition(self):
         """Test detection of internal word repetition."""
         user_id = "test_user_3"
 
-        # Test with repeated word (3+ chars)
         response1 = "hello hello hello world"
         is_repetitive, reason = response_uniqueness.is_repetitive_response(
             user_id, response1
@@ -87,36 +89,38 @@ class TestAntiRepetition(unittest.TestCase):
         self.assertTrue(is_repetitive)
         self.assertIn("Repeated words", reason)
 
-        # Test with word repeated 2+ times (but short word - should not trigger word repetition)
         response2 = "hi hi hi world"
         is_repetitive, reason = response_uniqueness.is_repetitive_response(
             user_id, response2
         )
-        # Might still be repetitive due to other patterns, but not specifically repeated words
-        # This is expected behavior
 
+    @unittest.skip("Internal repetition detection was intentionally disabled - it was flagging normal word usage within single responses")
     def test_internal_phrase_repetition(self):
         """Test detection of internal phrase repetition."""
         user_id = "test_user_4"
 
-        # Test with repeated 2-word phrase
         response1 = "how are how are you doing"
         is_repetitive, reason = response_uniqueness.is_repetitive_response(
             user_id, response1
         )
         self.assertTrue(is_repetitive)
-        self.assertIn("Repeated", reason)  # More general assertion
+        self.assertIn("Repeated", reason)
 
-        # Test with repeated 3-word phrase
         response2 = "nice to meet you nice to meet you too"
         is_repetitive, reason = response_uniqueness.is_repetitive_response(
             user_id, response2
         )
         self.assertTrue(is_repetitive)
-        self.assertIn("Repeated", reason)  # More general assertion
+        self.assertIn("Repeated", reason)
 
     def test_user_isolation(self):
-        """Test that responses are isolated by user."""
+        """Test that responses are isolated by user, but with global duplicate detection.
+
+        NOTE: The system now includes GLOBAL response tracking to prevent
+        the bot from giving identical responses to different users.
+        This is intentional - user1 and user2 should NOT both get "This is a common response"
+        if user1 already received it.
+        """
         user1 = "test_user_1"
         user2 = "test_user_2"
         common_response = "This is a common response"
@@ -124,13 +128,15 @@ class TestAntiRepetition(unittest.TestCase):
         # Add response for user1
         response_uniqueness.add_response(user1, common_response)
 
-        # Check that user2 is not affected
+        # Check that user2 IS affected by GLOBAL tracking (intentional behavior)
+        # The bot should not give identical responses to different users
         is_repetitive, reason = response_uniqueness.is_repetitive_response(
             user2, common_response
         )
-        self.assertFalse(is_repetitive)
+        self.assertTrue(is_repetitive)  # Global duplicate detection
+        self.assertIn("duplicate", reason.lower())
 
-        # But user1 would be affected
+        # user1 would also be affected (same response as before)
         is_repetitive, reason = response_uniqueness.is_repetitive_response(
             user1, common_response
         )
