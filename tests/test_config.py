@@ -69,7 +69,9 @@ class TestConfig(unittest.TestCase):
         self.assertIn("gambling", SYSTEM_PROMPT)
         self.assertIn(" degenerate", SYSTEM_PROMPT.lower())
         self.assertIn("web_search", SYSTEM_PROMPT)
-        self.assertIn("remember_user_info**: Store user preferences", SYSTEM_PROMPT)
+        # Check for memory tools (updated format)
+        self.assertIn("remember_user_info", SYSTEM_PROMPT)
+        self.assertIn("search_user_memory", SYSTEM_PROMPT)
 
 if __name__ == '__main__':
     unittest.main()

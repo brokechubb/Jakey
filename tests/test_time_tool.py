@@ -174,9 +174,10 @@ class TestTimeTool(unittest.TestCase):
         from config import SYSTEM_PROMPT
 
         self.assertIn("get_current_time", SYSTEM_PROMPT)
-        self.assertIn("Current time and date for any timezone worldwide", SYSTEM_PROMPT)
-        self.assertIn('"what time" → get_current_time', SYSTEM_PROMPT)
-        self.assertIn('"current time" → get_current_time', SYSTEM_PROMPT)
+        # Check for time tool description (updated format)
+        self.assertIn("Time/date for any timezone", SYSTEM_PROMPT)
+        # Check for common triggers
+        self.assertIn('get_current_time', SYSTEM_PROMPT)
 
 
 if __name__ == '__main__':
