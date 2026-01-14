@@ -23,6 +23,75 @@ OPENROUTER_SITE_URL = os.getenv("OPENROUTER_SITE_URL",
                                 "https://github.com/chubbb/Jakey")
 OPENROUTER_APP_NAME = os.getenv("OPENROUTER_APP_NAME", "Jakey")
 
+# =============================================================================
+# CENTRALIZED MODEL CONFIGURATION
+# All model lists are defined here to prevent duplication and ensure consistency
+# =============================================================================
+
+# Model used for web search queries
+WEB_SEARCH_MODEL = "meta-llama/llama-3.3-70b-instruct:free"
+
+# Model used for function/tool calling when current model doesn't support it
+FUNCTION_CALLING_FALLBACK_MODEL = "openai/gpt-oss-120b:free"
+
+# Models that support function/tool calling (verified Jan 2026)
+# NOTE: Google models disabled due to OpenRouter billing issues
+FUNCTION_CALLING_MODELS = [
+    "openai/gpt-oss-120b:free",
+    "qwen/qwen3-coder:free",
+    "xiaomi/mimo-v2-flash:free",
+    "mistralai/devstral-2512:free",
+    "kwaipilot/kat-coder-pro:free",
+    "meta-llama/llama-3.3-70b-instruct:free",
+    "mistralai/mistral-small-3.1-24b-instruct:free",
+    "nvidia/nemotron-nano-12b-v2-vl:free",
+    "nvidia/nemotron-nano-9b-v2:free",
+    "nex-agi/deepseek-v3.1-nex-n1:free",
+]
+
+# Known working models for fallback (in priority order)
+WORKING_MODELS = [
+    "meta-llama/llama-3.3-70b-instruct:free",
+    "xiaomi/mimo-v2-flash:free",
+    "openai/gpt-oss-120b:free",
+    "mistralai/devstral-2512:free",
+]
+
+# Known broken/unreliable models to avoid
+BROKEN_MODELS = [
+    "mistralai/mistral-small-3.1-24b-instruct:free",
+]
+
+# Fallback models for error recovery (basic free tier models)
+FALLBACK_MODELS = [
+    "nvidia/nemotron-nano-9b-v2:free",
+    "deepseek/deepseek-r1:free",
+    "meta-llama/llama-3.3-70b-instruct:free",
+    "meta-llama/llama-3.2-3b-instruct:free",
+    "mistralai/mistral-small-3.2-24b-instruct:free",
+    "deepseek/deepseek-chat:free",
+]
+
+# Recommended models for %models command (model_id, description)
+RECOMMENDED_MODELS = [
+    ("meta-llama/llama-3.3-70b-instruct:free", "Jakey's default - reliable, clean responses"),
+    ("google/gemma-3-27b-it:free", "Multimodal, 140 languages, solid tool calling"),
+    ("mistralai/mistral-small-3.1-24b-instruct:free", "Fast responses, good for conversation"),
+    ("xiaomi/mimo-v2-flash:free", "Fast reasoning model with good instruction following"),
+    ("nex-agi/deepseek-v3.1-nex-n1:free", "DeepSeek variant optimized for instruction following"),
+    ("nvidia/nemotron-nano-12b-v2-vl:free", "NVIDIA's compact multimodal model"),
+    ("nvidia/nemotron-nano-9b-v2:free", "NVIDIA's compact 9B instruction model"),
+    ("openai/gpt-oss-120b:free", "Large 120B parameter open-source model"),
+    ("mistralai/devstral-2512:free", "Mistral's development model, good for coding tasks"),
+]
+
+# Quick model suggestions for help text
+QUICK_MODEL_SUGGESTIONS = [
+    "nvidia/nemotron-nano-9b-v2:free",
+    "deepseek/deepseek-chat-v3.1:free",
+    "meta-llama/llama-3.3-70b-instruct:free",
+]
+
 # CoinMarketCap API Configuration
 COINMARKETCAP_API_KEY = os.getenv("COINMARKETCAP_API_KEY")
 

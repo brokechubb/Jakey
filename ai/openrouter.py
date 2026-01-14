@@ -18,6 +18,9 @@ from config import (
     OPENROUTER_TEXT_TIMEOUT,
     OPENROUTER_HEALTH_TIMEOUT,
     TEXT_API_RATE_LIMIT,
+    FUNCTION_CALLING_MODELS,
+    FUNCTION_CALLING_FALLBACK_MODEL,
+    WORKING_MODELS,
 )
 import logging
 
@@ -109,11 +112,7 @@ class OpenRouterAPI:
         # OpenRouter limits the models array to 3 items max
         # Avoid models with mandatory reasoning (openai/gpt-oss-120b)
         # Avoid Google models - OpenRouter's Google billing is often disabled (403 errors)
-        self.fallback_models = [
-            "xiaomi/mimo-v2-flash:free",
-            "qwen/qwen3-coder:free",
-            "meta-llama/llama-3.3-70b-instruct:free",
-        ]
+        self.fallback_models = WORKING_MODELS[:3]  # Use first 3 from config
         
         logger.info(f"OpenRouter API initialized: enabled={self.enabled}, model={self.default_model}, timeout={self.text_timeout}s, rate_limit={self.rate_limit}/min")
     
@@ -416,25 +415,12 @@ class OpenRouterAPI:
         # Models that support function calling
         # Updated as of Jan 2026 based on OpenRouter free models
         # NOTE: Google models removed due to OpenRouter billing issues (403 errors)
-        function_calling_models = [
-            "openai/gpt-oss-120b:free",
-            # "google/gemini-2.0-flash-exp:free",  # Disabled - OpenRouter Google billing broken
-            # "google/gemma-3-27b-it:free",  # Disabled - OpenRouter Google billing broken
-            "qwen/qwen3-coder:free",
-            "xiaomi/mimo-v2-flash:free",
-            "mistralai/devstral-2512:free",
-            "kwaipilot/kat-coder-pro:free",
-            "meta-llama/llama-3.3-70b-instruct:free",
-            "mistralai/mistral-small-3.1-24b-instruct:free",
-            "nvidia/nemotron-nano-12b-v2-vl:free",
-            "nvidia/nemotron-nano-9b-v2:free",
-            "nex-agi/deepseek-v3.1-nex-n1:free",
-        ]
+        # List is centralized in config.py as FUNCTION_CALLING_MODELS
         
-        # If tools are provided but model doesn't support function calling, use gpt-oss-120b
-        if tools and model not in function_calling_models:
+        # If tools are provided but model doesn't support function calling, use fallback
+        if tools and model not in FUNCTION_CALLING_MODELS:
             original_model = model
-            model = "openai/gpt-oss-120b:free"  # Best free model with function calling
+            model = FUNCTION_CALLING_FALLBACK_MODEL
             is_free = True  # This model is also free
             logger.debug(f"Model {original_model} doesn't support function calling. Switching to {model} for tool use.")
         

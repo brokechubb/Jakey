@@ -11,7 +11,7 @@ import pytz
 from discord.ext import commands
 
 from ai.openrouter import openrouter_api
-from config import ADMIN_USER_IDS
+from config import ADMIN_USER_IDS, FALLBACK_MODELS, RECOMMENDED_MODELS
 from data.database import db
 from media.image_generator import image_generator
 from utils import random_indian_generator
@@ -733,11 +733,7 @@ def setup_commands(bot):
             try:
                 available_models = openrouter_api.list_models()
             except:
-                available_models = [
-                    "nvidia/nemotron-nano-9b-v2:free",
-                    "deepseek/deepseek-chat-v3.1:free",
-                    "meta-llama/llama-3.3-70b-instruct:free",
-                ]
+                available_models = FALLBACK_MODELS
 
             if model_name in available_models:
                 bot.current_model = model_name
@@ -772,24 +768,14 @@ def setup_commands(bot):
             # Recommended models for Jakey (best tool calling + conversation)
             # Excluded: nvidia/nemotron-3-nano-30b-a3b (exposes thinking in reasoning field)
             # Excluded: kwaipilot/kat-coder-pro (coding-focused, not ideal for chat)
-            recommended_models = [
-                ("meta-llama/llama-3.3-70b-instruct:free", "⭐ Jakey's default - reliable, clean responses"),
-                ("google/gemma-3-27b-it:free", "Multimodal, 140 languages, solid tool calling"),
-                ("mistralai/mistral-small-3.1-24b-instruct:free", "Fast responses, good for conversation"),
-                ("xiaomi/mimo-v2-flash:free", "Fast reasoning model with good instruction following"),
-                ("nex-agi/deepseek-v3.1-nex-n1:free", "DeepSeek variant optimized for instruction following"),
-                ("nvidia/nemotron-nano-12b-v2-vl:free", "NVIDIA's compact multimodal model"),
-                ("nvidia/nemotron-nano-9b-v2:free", "NVIDIA's compact 9B instruction model"),
-                ("openai/gpt-oss-120b:free", "Large 120B parameter open-source model"),
-                ("mistralai/devstral-2512:free", "Mistral's development model, good for coding tasks"),
-            ]
+            # List is centralized in config.py as RECOMMENDED_MODELS
 
-            response = "**🤖 RECOMMENDED MODELS FOR JAKEY**\n"
+            response = "**RECOMMENDED MODELS FOR JAKEY**\n"
             response += "*Models tested for clean responses and tool calling*\n\n"
 
             response += "**Recommended:**\n"
-            for model, desc in recommended_models:
-                response += f"• `{model}`\n  └─ {desc}\n"
+            for model, desc in RECOMMENDED_MODELS:
+                response += f"• `{model}`\n  - {desc}\n"
 
             response += "\n**Image Styles (Arta API):**\n"
             response += "• **49 Artistic Styles** - Fantasy Art, Van Gogh, Photographic, Watercolor\n"

@@ -331,9 +331,11 @@ from config import (
     CHANNEL_CONTEXT_MINUTES,
     CONVERSATION_HISTORY_LIMIT,
     DISCORD_TOKEN,
+    FALLBACK_MODELS,
     GENDER_ROLES_GUILD_ID,
     GUILD_BLACKLIST,
     IMAGE_API_RATE_LIMIT,
+    QUICK_MODEL_SUGGESTIONS,
     RATE_LIMIT_COOLDOWN,
     RELAY_MENTION_ROLE_MAPPINGS,
     SYSTEM_PROMPT,
@@ -521,14 +523,7 @@ class JakeyBot(commands.Bot):
                 logger.error(f"Failed to update model capabilities cache: {e}")
                 # Fallback to basic models (OpenRouter free models only)
                 model_key = model_name.strip().lower()
-                return model_key in [
-                    "nvidia/nemotron-nano-9b-v2:free",
-                    "deepseek/deepseek-r1:free",
-                    "meta-llama/llama-3.3-70b-instruct:free",
-                    "meta-llama/llama-3.2-3b-instruct:free",
-                    "mistralai/mistral-small-3.2-24b-instruct:free",
-                    "deepseek/deepseek-chat:free",
-                ]
+                return model_key in FALLBACK_MODELS
 
         # Check if model supports tools from cache
         model_key = model_name.strip().lower()
@@ -591,14 +586,7 @@ class JakeyBot(commands.Bot):
             return True
 
         # Final hardcoded fallback (OpenRouter free models only)
-        return model_lower in [
-            "nvidia/nemotron-nano-9b-v2:free",
-            "deepseek/deepseek-r1:free",
-            "deepseek/deepseek-chat:free",
-            "meta-llama/llama-3.3-70b-instruct:free",
-            "meta-llama/llama-3.2-3b-instruct:free",
-            "mistralai/mistral-small-3.2-24b-instruct:free",
-        ]
+        return model_lower in FALLBACK_MODELS
 
     # Anti-Repetition Methods
     def _is_repetitive_response(
@@ -4773,22 +4761,17 @@ class JakeyBot(commands.Bot):
             elif command_name == "model":
                 # Switch AI model
                 if not args:
+                    # Build help text from config
+                    model_list = "\n".join([f"• `{m}`" for m in QUICK_MODEL_SUGGESTIONS])
                     await self._safe_send_message(
                         channel,
-                        "💀 **Usage:** `model <model_name>`\n\n**Available Models:**\n• `nvidia/nemotron-nano-9b-v2:free` - Fast and reliable\n• `deepseek/deepseek-chat-v3.1:free` - Advanced reasoning\n• `meta-llama/llama-3.3-70b-instruct:free` - Large context\n\nExample: `model nvidia/nemotron-nano-9b-v2:free`",
+                        f"**Usage:** `model <model_name>`\n\n**Available Models:**\n{model_list}\n\nExample: `model {QUICK_MODEL_SUGGESTIONS[0]}`",
                     )
                     return True
 
                 try:
                     model_name = args[0].lower()
-                    available_models = [
-                        "nvidia/nemotron-nano-9b-v2:free",
-                        "deepseek/deepseek-chat-v3.1:free",
-                        "deepseek/deepseek-r1:free",
-                        "meta-llama/llama-3.3-70b-instruct:free",
-                        "meta-llama/llama-3.2-3b-instruct:free",
-                        "mistralai/mistral-small-3.2-24b-instruct:free",
-                    ]
+                    available_models = FALLBACK_MODELS
 
                     if model_name not in available_models:
                         await self._safe_send_message(

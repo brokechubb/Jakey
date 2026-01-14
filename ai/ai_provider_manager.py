@@ -9,25 +9,16 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
 from ai.openrouter import openrouter_api
-from config import OPENROUTER_DEFAULT_MODEL
+from config import (
+    OPENROUTER_DEFAULT_MODEL,
+    WEB_SEARCH_MODEL,
+    WORKING_MODELS,
+    BROKEN_MODELS,
+    FALLBACK_MODELS,
+)
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
-
-WEB_SEARCH_MODEL = "meta-llama/llama-3.3-70b-instruct:free"
-
-# Known working models for fallback
-WORKING_MODELS = [
-    "meta-llama/llama-3.3-70b-instruct:free",
-    "xiaomi/mimo-v2-flash:free", 
-    "openai/gpt-oss-120b:free",
-    "mistralai/devstral-2512:free"
-]
-
-# Known broken models to replace
-BROKEN_MODELS = [
-    "mistralai/mistral-small-3.1-24b-instruct:free"
-]
 
 
 @dataclass
@@ -358,11 +349,7 @@ class SimpleAIProviderManager:
         Check if a model is available on a specific provider.
         """
         provider_models = {
-            "openrouter": [
-                "nvidia/nemotron-nano-9b-v2:free",
-                "deepseek/deepseek-chat-v3.1:free",
-                "openai/gpt-oss-20b:free",
-            ],
+            "openrouter": FALLBACK_MODELS,
         }
 
         available_models = provider_models.get(provider, [])
