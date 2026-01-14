@@ -50,7 +50,7 @@ class TestProjectStructure(unittest.TestCase):
             'config',
             'data.database',
             'tools.tool_manager',
-            'ai.pollinations',
+            'ai.openrouter',  # Replaced ai.pollinations (removed)
             'media.image_generator',
             'bot.client'
         ]
