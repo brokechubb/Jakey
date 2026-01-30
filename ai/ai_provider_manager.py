@@ -107,7 +107,7 @@ class SimpleAIProviderManager:
         self,
         messages: List[Dict[str, Any]],
         model: Optional[str] = None,
-        temperature: float = 0.7,
+        temperature: float = 1.0,
         max_tokens: int = 1000,
         tools: Optional[List[Dict]] = None,
         tool_choice: str = "auto",
@@ -148,17 +148,33 @@ class SimpleAIProviderManager:
 
         try:
             request_start = time.time()
-            result = await asyncio.to_thread(
-                self.openrouter_api.generate_text,
-                messages=messages,
-                model=model,
-                temperature=temperature,
-                max_tokens=max_tokens,
-                tools=tools,
-                tool_choice=tool_choice,
-                reasoning={"enabled": False},  # Explicitly disable thinking for OpenRouter
-                **kwargs,
-            )
+            # Only pass reasoning parameter if specifically requested in kwargs
+            # Otherwise, let OpenRouter handle reasoning per model defaults
+            api_kwargs = kwargs.copy()
+            if 'reasoning' not in api_kwargs:
+                result = await asyncio.to_thread(
+                    self.openrouter_api.generate_text,
+                    messages=messages,
+                    model=model,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    tools=tools,
+                    tool_choice=tool_choice,
+                    **api_kwargs,  # reasoning not specified, so model uses its default
+                )
+            else:
+                # Only pass reasoning if explicitly provided
+                result = await asyncio.to_thread(
+                    self.openrouter_api.generate_text,
+                    messages=messages,
+                    model=model,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    tools=tools,
+                    tool_choice=tool_choice,
+                    reasoning=api_kwargs.pop('reasoning'),
+                    **api_kwargs,
+                )
 
             request_time = time.time() - request_start
             logger.debug(f"OpenRouter API call completed in {request_time:.2f}s")
@@ -208,16 +224,33 @@ class SimpleAIProviderManager:
 
         try:
             request_start = time.time()
-            result = await asyncio.to_thread(
-                self.openrouter_api.generate_text,
-                messages=messages,
-                model=WEB_SEARCH_MODEL,
-                temperature=temperature,
-                max_tokens=max_tokens,
-                tools=None,
-                tool_choice=None,
-                **kwargs,
-            )
+            # Only pass reasoning parameter if specifically requested in kwargs
+            # Otherwise, let OpenRouter handle reasoning per model defaults
+            api_kwargs = kwargs.copy()
+            if 'reasoning' not in api_kwargs:
+                result = await asyncio.to_thread(
+                    self.openrouter_api.generate_text,
+                    messages=messages,
+                    model=WEB_SEARCH_MODEL,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    tools=None,
+                    tool_choice=None,
+                    **api_kwargs,  # reasoning not specified, so model uses its default
+                )
+            else:
+                # Only pass reasoning if explicitly provided
+                result = await asyncio.to_thread(
+                    self.openrouter_api.generate_text,
+                    messages=messages,
+                    model=WEB_SEARCH_MODEL,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    tools=None,
+                    tool_choice=None,
+                    reasoning=api_kwargs.pop('reasoning'),
+                    **api_kwargs,
+                )
 
             request_time = time.time() - request_start
             logger.debug(f"Web search API call completed in {request_time:.2f}s")

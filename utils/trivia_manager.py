@@ -356,6 +356,9 @@ class TriviaManager:
         try:
             categories = await self.db.get_all_categories()
 
+            # Filter out categories with no questions
+            categories = [c for c in categories if c.get("question_count", 0) > 0]
+
             # Add statistics for each category
             for cat in categories:
                 stats = await self.db.get_category_stats(cat["name"])

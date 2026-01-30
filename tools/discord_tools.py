@@ -390,7 +390,10 @@ class DiscordTools:
             # Check if it's a text channel
             if not isinstance(channel, discord.TextChannel):
                 logger.error(f"Channel {channel_id} is not a text channel, type: {type(channel)}")
-                return {"error": f"Channel {channel_id} is not a text channel"}
+                return {
+                    "error": f"Channel {channel_id} is not a text channel. You tried to send to a DM channel. Use discord_send_dm instead for private messages.",
+                    "action_required": "use_dm_tool"
+                }
 
             logger.info(f"Found text channel: #{channel.name} in guild {channel.guild.name}")
 
@@ -445,7 +448,11 @@ class DiscordTools:
             current_time = time.time()
             if current_time - self._last_dm_time < self._dm_cooldown:
                 remaining = int(self._dm_cooldown - (current_time - self._last_dm_time))
-                return {"error": f"DM cooldown active. Please wait {remaining} seconds before sending another DM."}
+                return {
+                    "error": f"DM cooldown active. Wait {remaining} seconds.",
+                    "action_required": "wait",
+                    "retry_after": remaining
+                }
             
             # Add delay to avoid captcha
             import asyncio
@@ -633,29 +640,36 @@ class DiscordTools:
             logger.error(f"Error kicking user: {e}")
             return {"error": f"Failed to kick user: {str(e)}"}
 
-    async def ban_user(self, guild_id: str, user_id: str, reason: str = "", delete_message_seconds: int = 0) -> Dict[str, Any]:
+    async def ban_user(self, guild_id: str, user_id: str, reason: str = "", delete_message_seconds: Union[int, str] = 0) -> Dict[str, Any]:
         """Ban a user from a specific guild"""
         try:
             guild = self.bot.get_guild(int(guild_id))
             if not guild:
                 return {"error": f"Guild with ID {guild_id} not found"}
-            
+
             user = self.bot.get_user(int(user_id))
             if not user:
                 try:
                     user = await self.bot.fetch_user(int(user_id))
                 except:
                     pass
-            
+
             if not user:
                  return {"error": f"User with ID {user_id} not found/could not be fetched."}
 
             try:
+                # Convert delete_message_seconds to int if it's a string (AI tool calls pass strings)
+                if isinstance(delete_message_seconds, str):
+                    try:
+                        delete_message_seconds = int(delete_message_seconds)
+                    except ValueError:
+                        delete_message_seconds = 0  # Default to 0 on invalid input
+
                 # delete_message_days is deprecated in favor of delete_message_seconds in newer versions,
-                # but discord.py-self often aligns with older discord.py (1.7.3). 
+                # but discord.py-self often aligns with older discord.py (1.7.3).
                 # To be safe, we try one and fallback? Or just use delete_message_days (0-7).
                 # Common discord.py-self usage is delete_message_days.
-                
+
                 await guild.ban(user, reason=reason, delete_message_days=min(7, max(0, int(delete_message_seconds / 86400))))
                 
                 return {
@@ -711,7 +725,7 @@ class DiscordTools:
             logger.error(f"Error unbanning user: {e}")
             return {"error": f"Failed to unban user: {str(e)}"}
 
-    async def timeout_user(self, guild_id: str, user_id: str, duration_minutes: int, reason: str = "") -> Dict[str, Any]:
+    async def timeout_user(self, guild_id: str, user_id: str, duration_minutes: Union[int, str], reason: str = "") -> Dict[str, Any]:
         """Timeout/mute a user for a specific duration"""
         try:
             guild = self.bot.get_guild(int(guild_id))
@@ -727,6 +741,13 @@ class DiscordTools:
 
             try:
                 import datetime
+                # Convert duration_minutes to int if it's a string (AI tool calls pass strings)
+                if isinstance(duration_minutes, str):
+                    try:
+                        duration_minutes = int(duration_minutes)
+                    except ValueError:
+                        return {"error": f"Invalid duration_minutes: '{duration_minutes}'. Must be a number."}
+
                 # Calculate timeout until
                 if duration_minutes > 0:
                     until = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(minutes=duration_minutes)
@@ -758,14 +779,14 @@ class DiscordTools:
             logger.error(f"Error timing out user: {e}")
             return {"error": f"Failed to timeout user: {str(e)}"}
             
-    async def purge_messages(self, channel_id: str, limit: int = 10, user_id: str = None) -> Dict[str, Any]:
+    async def purge_messages(self, channel_id: str, limit: Union[int, str] = 10, user_id: Optional[str] = None) -> Dict[str, Any]:
         """Purge/delete messages from a channel"""
         try:
             # Parse channel ID
             channel_id_clean = self._parse_channel_id(channel_id)
             if not channel_id_clean:
                  return {"error": "Invalid channel ID"}
-            
+
             channel = self.bot.get_channel(channel_id_clean)
             if not channel:
                 try:
@@ -775,7 +796,14 @@ class DiscordTools:
 
             if not isinstance(channel, discord.TextChannel):
                  return {"error": "Can only purge messages in text channels"}
-            
+
+            # Convert limit to int if it's a string (AI tool calls pass strings)
+            if isinstance(limit, str):
+                try:
+                    limit = int(limit)
+                except ValueError:
+                    limit = 10  # Default to 10 on invalid input
+
             # Limit safety
             limit = min(max(1, limit), 100) # Max 100 at a time for safety
             

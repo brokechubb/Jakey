@@ -34,10 +34,12 @@ class ToolManager:
     def __init__(self):
         # Create a session for connection pooling (reuses TCP connections)
         self.session = requests.Session()
-        self.session.headers.update({
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-        })
-        
+        self.session.headers.update(
+            {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            }
+        )
+
         self.tools = {
             "set_reminder": self.set_reminder,
             "list_reminders": self.list_reminders,
@@ -59,6 +61,8 @@ class ToolManager:
             "get_current_time": self.get_current_time,
             "remember_user_mcp": self.remember_user_mcp,
             "generate_keno_numbers": self.generate_keno_numbers,
+            # Trivia tools
+            "play_trivia": self.play_trivia,
             # Discord tools
             "discord_get_user_info": self.discord_get_user_info,
             "discord_list_guilds": self.discord_list_guilds,
@@ -87,6 +91,9 @@ class ToolManager:
 
         # Initialize Discord tools - will be set later by main.py after bot initialization
         self.discord_tools = None
+
+        # Initialize trivia games dictionary at startup for proper answer detection
+        self._trivia_games = {}  # channel_id -> game_state
 
         # Define corrected bonus schedules for different sites
         self.bonus_schedules = {
@@ -154,6 +161,8 @@ class ToolManager:
             "remember_user_info": 1.0,  # 1 second between calls
             "remember_user_mcp": 1.0,  # 1 second between calls
             "search_user_memory": 0.1,  # 0.1 seconds between calls
+            # Trivia tool rate limits
+            "play_trivia": 3.0,  # 3 seconds between calls
             # Discord tool rate limits
             "discord_get_user_info": 1.0,
             "discord_list_guilds": 1.0,
@@ -169,11 +178,15 @@ class ToolManager:
             "discord_unban_user": 2.0,
             "discord_timeout_user": 2.0,
             "discord_remove_timeout": 2.0,
-            "discord_purge_messages": 5.0, # Higher rate limit for bulk delete
+            "discord_purge_messages": 5.0,  # Higher rate limit for bulk delete
             "discord_pin_message": 2.0,
             "discord_unpin_message": 2.0,
             "discord_delete_message": 2.0,
         }
+
+        # Initialize trivia games dictionary to track active games
+        # Maps channel_id to game state dictionary with question, category, start_time, attempts
+        self._trivia_games = {}
 
     def _validate_crypto_symbol(self, symbol: str) -> bool:
         """Validate cryptocurrency symbol using security framework."""
@@ -794,13 +807,13 @@ class ToolManager:
                 "type": "function",
                 "function": {
                     "name": "discord_send_message",
-                    "description": "Send a message to a specific Discord channel",
+                    "description": "Send a message to a Discord text channel. ONLY use for server/guild channels, NEVER for DMs. Use 'current' for the current channel.",
                     "parameters": {
                         "type": "object",
                         "properties": {
                             "channel_id": {
                                 "type": "string",
-                                "description": "The Discord channel ID to send the message to. Use 'current' for the channel where the user sent the message.",
+                                "description": "The Discord channel ID to send the message to. Use 'current' for the channel where the user sent the message. WARNING: Do NOT use DM channel IDs - use discord_send_dm instead.",
                             },
                             "content": {
                                 "type": "string",
@@ -819,17 +832,17 @@ class ToolManager:
                 "type": "function",
                 "function": {
                     "name": "discord_send_dm",
-                    "description": "Send a direct message to a specific Discord user",
+                    "description": "Send a direct message to a Discord user. Use ONLY for DMs, NEVER for server channels. Has a 10-second cooldown between messages.",
                     "parameters": {
                         "type": "object",
                         "properties": {
                             "user_id": {
                                 "type": "string",
-                                "description": "The Discord user ID to send the DM to",
+                                "description": "The Discord user ID (snowflake) to send the DM to. NOTE: This is NOT a channel ID. Must be a user ID.",
                             },
                             "content": {
                                 "type": "string",
-                                "description": "The message content to send",
+                                "description": "The message content to send. Keep it concise since there's a cooldown.",
                             },
                         },
                         "required": ["user_id", "content"],
@@ -884,8 +897,8 @@ class ToolManager:
                             "delete_message_seconds": {
                                 "type": "integer",
                                 "description": "Number of seconds to delete messages for (0-604800)",
-                                "default": 0
-                            }
+                                "default": 0,
+                            },
                         },
                         "required": ["guild_id", "user_id"],
                     },
@@ -985,7 +998,7 @@ class ToolManager:
                             "limit": {
                                 "type": "integer",
                                 "description": "Number of messages to delete (max 100)",
-                                "default": 10
+                                "default": 10,
                             },
                             "user_id": {
                                 "type": "string",
@@ -1099,6 +1112,32 @@ class ToolManager:
                                 "maximum": 10,
                             }
                         },
+                    },
+                },
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "play_trivia",
+                    "description": "Start an interactive trivia game in the current channel. This creates an engaging trivia question that users in the chat can answer. The AI should wait for user responses and check answers.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "channel_id": {
+                                "type": "string",
+                                "description": "Discord channel ID where to post the trivia question",
+                            },
+                            "category": {
+                                "type": "string",
+                                "description": "Optional trivia category. IMPORTANT: Use %triviacats command first to see available categories before specifying one. If not provided, a random category will be selected automatically.",
+                            },
+                            "difficulty": {
+                                "type": "integer",
+                                "description": "Optional difficulty level (1=easy, 2=medium, 3=hard). Defaults to mixed difficulty.",
+                                "enum": [1, 2, 3],
+                            },
+                        },
+                        "required": ["channel_id"],
                     },
                 },
             },
@@ -1383,7 +1422,9 @@ class ToolManager:
                 "X-CMC_PRO_API_KEY": COINMARKETCAP_API_KEY,
             }
 
-            response = self.session.get(url, headers=headers, params=parameters, timeout=10)
+            response = self.session.get(
+                url, headers=headers, params=parameters, timeout=10
+            )
             response.raise_for_status()
             data = response.json()
 
@@ -1541,7 +1582,9 @@ class ToolManager:
                             # Don't include URLs - AI guidance says not to cite them
                             results.append(f"• {title}: {content}")
 
-                        logger.info(f"web_search success: {len(data['results'])} results for '{query[:50]}'")
+                        logger.info(
+                            f"web_search success: {len(data['results'])} results for '{query[:50]}'"
+                        )
                         return "\n".join(results)
                     else:
                         logger.info(f"web_search no results for: {query}")
@@ -1557,7 +1600,9 @@ class ToolManager:
             logger.warning(f"web_search timeout")
             return "Search timed out. Please try again."
         except requests.exceptions.ConnectionError:
-            logger.error(f"web_search connection error - is SearXNG running on localhost:8086?")
+            logger.error(
+                f"web_search connection error - is SearXNG running on localhost:8086?"
+            )
             return "Search service unavailable. Please try again later."
         except requests.exceptions.RequestException as e:
             logger.warning(f"web_search request error: {e}")
@@ -1602,19 +1647,25 @@ class ToolManager:
                             url = result.get("url", "")
                             results.append(f"• {title}: {content} ({url})")
 
-                        logger.info(f"company_research success: {len(data['results'])} results for '{company_name}'")
+                        logger.info(
+                            f"company_research success: {len(data['results'])} results for '{company_name}'"
+                        )
                         return "\n".join(results)
                     else:
                         return f"No company information found for '{company_name}'."
                 except ValueError:
-                    return f"Error parsing company research results for '{company_name}'."
+                    return (
+                        f"Error parsing company research results for '{company_name}'."
+                    )
             else:
                 return f"Search service returned error {response.status_code}. Try again later."
 
         except requests.exceptions.Timeout:
             return "Company research timed out. Please try again."
         except requests.exceptions.ConnectionError:
-            logger.error(f"company_research connection error - is SearXNG running on localhost:8086?")
+            logger.error(
+                f"company_research connection error - is SearXNG running on localhost:8086?"
+            )
             return "Search service unavailable. Please try again later."
         except requests.exceptions.RequestException as e:
             logger.warning(f"company_research request error: {e}")
@@ -1739,10 +1790,12 @@ class ToolManager:
             return "Rate limit exceeded. Please wait before making another calculation."
 
         try:
-            # Safe evaluation - allow basic math operations and comparison operators
-            allowed_chars = set("0123456789+-*/().<>=! ")
-            if not all(c in allowed_chars for c in expression):
-                return "Error: Invalid characters in expression"
+            # Safe evaluation - allow alphanumeric characters and basic operators for flexible expressions
+            # AST parsing below provides actual security - this validation just excludes truly dangerous characters
+            disallowed_pattern = r'[;\[\]{}"\'\\]'  # Reject: semicolons, brackets, quotes, backslash
+            import re
+            if re.search(disallowed_pattern, expression):
+                return "Error: Expression contains characters that could indicate code execution attempts. Only use numbers, operators, letters, and basic punctuation."
 
             # Use a safer evaluation method instead of eval
             import ast
@@ -2191,7 +2244,9 @@ class ToolManager:
             if self.discord_tools is None:
                 return "Discord tools not initialized. Bot may not be connected to Discord."
 
-            logger.info(f"discord_search_messages calling discord_tools.search_messages with channel_id={channel_id}, query='{query}', limit={limit}")
+            logger.info(
+                f"discord_search_messages calling discord_tools.search_messages with channel_id={channel_id}, query='{query}', limit={limit}"
+            )
             result = await self.discord_tools.search_messages(
                 channel_id, query, author_id, limit
             )
@@ -2203,7 +2258,9 @@ class ToolManager:
 
             messages = result["messages"]
             channel_info = result["channel"]
-            logger.info(f"discord_search_messages found {len(messages)} messages in #{channel_info['name']}")
+            logger.info(
+                f"discord_search_messages found {len(messages)} messages in #{channel_info['name']}"
+            )
             response = f"Search Results in Channel: #{channel_info['name']} ({channel_info['id']})\n"
             response += f"Guild: {channel_info['guild_name']}\n"
             response += f"Query: '{result['query']}'\n"
@@ -2313,7 +2370,7 @@ class ToolManager:
     def discord_get_user_roles(self, guild_id: Optional[str] = None) -> str:
         """Get roles for the currently logged-in user in a specific guild"""
         logger.info(f"discord_get_user_roles called with guild_id={guild_id}")
-        
+
         if not self._check_rate_limit("discord_get_user_roles"):
             return "Rate limit exceeded for Discord user roles request."
 
@@ -2323,7 +2380,7 @@ class ToolManager:
 
             result = self.discord_tools.get_user_roles(guild_id)
             logger.info(f"discord_get_user_roles result: {result}")
-            
+
             if "error" in result:
                 logger.error(f"discord_get_user_roles error: {result['error']}")
                 return f"Error getting Discord user roles: {result['error']}"
@@ -2331,7 +2388,9 @@ class ToolManager:
             user = result["user"]
             guild = result["guild"]
             roles = result["roles"]
-            logger.info(f"discord_get_user_roles: user={user['display_name']}, guild={guild['name']}, roles_count={len(roles)}")
+            logger.info(
+                f"discord_get_user_roles: user={user['display_name']}, guild={guild['name']}, roles_count={len(roles)}"
+            )
 
             if not roles:
                 return f"User {user['display_name']} has no roles in guild '{guild['name']}' (ID: {guild['id']})."
@@ -2343,7 +2402,9 @@ class ToolManager:
         except Exception as e:
             return f"Error getting Discord user roles: {str(e)}"
 
-    async def discord_kick_user(self, guild_id: str, user_id: str, reason: str = "", **kwargs) -> str:
+    async def discord_kick_user(
+        self, guild_id: str, user_id: str, reason: str = "", **kwargs
+    ) -> str:
         """Kick a user from a specific guild"""
         if not self._check_rate_limit("discord_kick_user"):
             return "Rate limit exceeded for kick user request."
@@ -2360,7 +2421,14 @@ class ToolManager:
         except Exception as e:
             return f"Error kicking user: {str(e)}"
 
-    async def discord_ban_user(self, guild_id: str, user_id: str, reason: str = "", delete_message_seconds: int = 0, **kwargs) -> str:
+    async def discord_ban_user(
+        self,
+        guild_id: str,
+        user_id: str,
+        reason: str = "",
+        delete_message_seconds: int = 0,
+        **kwargs,
+    ) -> str:
         """Ban a user from a specific guild"""
         if not self._check_rate_limit("discord_ban_user"):
             return "Rate limit exceeded for ban user request."
@@ -2369,7 +2437,9 @@ class ToolManager:
             if self.discord_tools is None:
                 return "Discord tools not initialized. Bot may not be connected to Discord."
 
-            result = await self.discord_tools.ban_user(guild_id, user_id, reason, delete_message_seconds)
+            result = await self.discord_tools.ban_user(
+                guild_id, user_id, reason, delete_message_seconds
+            )
             if "error" in result:
                 return f"Error banning user: {result['error']}"
 
@@ -2377,7 +2447,9 @@ class ToolManager:
         except Exception as e:
             return f"Error banning user: {str(e)}"
 
-    async def discord_unban_user(self, guild_id: str, user_id: str, reason: str = "", **kwargs) -> str:
+    async def discord_unban_user(
+        self, guild_id: str, user_id: str, reason: str = "", **kwargs
+    ) -> str:
         """Unban a user from a specific guild"""
         if not self._check_rate_limit("discord_unban_user"):
             return "Rate limit exceeded for unban user request."
@@ -2394,11 +2466,18 @@ class ToolManager:
         except Exception as e:
             return f"Error unbanning user: {str(e)}"
 
-    async def discord_timeout_user(self, guild_id: str, user_id: str, duration_minutes: int, reason: str = "", **kwargs) -> str:
+    async def discord_timeout_user(
+        self,
+        guild_id: str,
+        user_id: str,
+        duration_minutes: int,
+        reason: str = "",
+        **kwargs,
+    ) -> str:
         """Timeout a user in a specific guild"""
         if not self._check_rate_limit("discord_timeout_user"):
             return "Rate limit exceeded for timeout user request."
-            
+
         if kwargs:
             # Log ignored arguments for debugging
             pass
@@ -2407,18 +2486,37 @@ class ToolManager:
             if self.discord_tools is None:
                 return "Discord tools not initialized. Bot may not be connected to Discord."
 
-            result = await self.discord_tools.timeout_user(guild_id, user_id, duration_minutes, reason)
+            # Ensure duration_minutes is an integer before passing to discord_tools
+            if isinstance(duration_minutes, str):
+                try:
+                    duration_minutes = int(duration_minutes)
+                except ValueError:
+                    return f"Error timing out user: Invalid duration_minutes: '{duration_minutes}'. Must be a number."
+
+            result = await self.discord_tools.timeout_user(
+                guild_id, user_id, duration_minutes, reason
+            )
             if "error" in result:
                 return f"Error timing out user: {result['error']}"
 
-            if result['duration_minutes'] > 0:
-                return f"✅ Successfully timed out user {result['user']} in {result['guild']} for {result['duration_minutes']} minutes.\nReason: {result['reason'] or 'None provided'}"
+            # Ensure the returned duration_minutes is an int for comparison
+            returned_duration = result.get("duration_minutes", 0)
+            if isinstance(returned_duration, str):
+                try:
+                    returned_duration = int(returned_duration)
+                except ValueError:
+                    returned_duration = 0
+
+            if returned_duration > 0:
+                return f"✅ Successfully timed out user {result['user']} in {result['guild']} for {returned_duration} minutes.\nReason: {result['reason'] or 'None provided'}"
             else:
                 return f"✅ Successfully removed timeout for user {result['user']} in {result['guild']}.\nReason: {result['reason'] or 'None provided'}"
         except Exception as e:
             return f"Error timing out user: {str(e)}"
 
-    async def discord_remove_timeout(self, guild_id: str, user_id: str, reason: str = "") -> str:
+    async def discord_remove_timeout(
+        self, guild_id: str, user_id: str, reason: str = ""
+    ) -> str:
         """Remove timeout from a user"""
         if not self._check_rate_limit("discord_remove_timeout"):
             return "Rate limit exceeded for remove timeout request."
@@ -2436,7 +2534,9 @@ class ToolManager:
         except Exception as e:
             return f"Error removing timeout: {str(e)}"
 
-    async def discord_purge_messages(self, channel_id: str, limit: int = 10, user_id: str = None) -> str:
+    async def discord_purge_messages(
+        self, channel_id: str, limit: int = 10, user_id: str = None
+    ) -> str:
         """Purge messages from a channel"""
         if not self._check_rate_limit("discord_purge_messages"):
             return "Rate limit exceeded for purge messages request."
@@ -2654,8 +2754,6 @@ class ToolManager:
                 "analyze_image",
                 "check_balance",
                 "get_bonus_schedule",
-                "discord_search_messages",
-                "discord_list_guild_members",
             ]
 
             # Run blocking tools in thread pool to avoid event loop blocking
@@ -2731,6 +2829,217 @@ class ToolManager:
         response += "\n*Numbers in brackets are your picks!*"
 
         return response
+
+    async def play_trivia(
+        self, channel_id: str, category: str = None, difficulty: int = None
+    ) -> str:
+        """Start an interactive trivia game in the specified channel and post the question
+
+        Args:
+            channel_id: Discord channel ID where to post the trivia question
+            category: Optional trivia category filter
+            difficulty: Optional difficulty level (1=easy, 2=medium, 3=hard)
+
+        Returns:
+            Success message if posted successfully, error message if failed
+        """
+        if not self._check_rate_limit("play_trivia", channel_id):
+            return "⏰ Trivia rate limit exceeded. Please wait before starting another game."
+
+        try:
+            # Handle "null" strings from AI
+            if isinstance(category, str) and category.lower() == "null":
+                category = None
+            if isinstance(difficulty, str) and difficulty.lower() == "null":
+                difficulty = None
+
+            # Convert difficulty to int if it's a string
+            if difficulty is not None:
+                try:
+                    difficulty = int(difficulty)
+                except ValueError:
+                    # Handle string literals like "none" or invalid numeric strings
+                    logger.warning(f"Invalid difficulty value '{difficulty}', using None")
+                    difficulty = None
+            # Import trivia manager
+            import random
+
+            from data.trivia_database import trivia_db
+
+            # Initialize if needed
+            if not hasattr(self, "_trivia_games"):
+                self._trivia_games = {}  # channel_id -> game_state
+
+            # Check if there's already an active game in this channel
+            if channel_id in self._trivia_games:
+                active_game = self._trivia_games[channel_id]
+                elapsed = asyncio.get_event_loop().time() - active_game["start_time"]
+                if elapsed < 60:  # Game expires after 60 seconds
+                    return f"❌ There's already an active trivia game in this channel! Wait for it to finish."
+
+            # Get available categories if category not specified
+            if category:
+                questions = await trivia_db.get_questions_by_category(
+                    category, limit=100
+                )
+                if not questions:
+                    return f"❌ No trivia questions found for category: `{category}`. Try %triviacats to see available categories."
+            else:
+                # Get all categories
+                categories = await trivia_db.get_all_categories()
+                if not categories:
+                    return "❌ No trivia categories available. An admin should run `%seedtrivia` first to populate the database."
+
+                # Pick a random category that has questions
+                categories_with_questions = [
+                    c for c in categories if c["question_count"] > 0
+                ]
+                if not categories_with_questions:
+                    return "❌ No trivia questions available. An admin should run `%seedtrivia` first."
+
+                selected_category = random.choice(categories_with_questions)
+                category = selected_category["name"]
+                questions = await trivia_db.get_questions_by_category(
+                    category, limit=100
+                )
+
+            # Filter by difficulty if specified
+            if difficulty:
+                questions = [
+                    q for q in questions if q.get("difficulty", 1) == difficulty
+                ]
+                if not questions:
+                    return f"❌ No questions found with difficulty level {difficulty} in category `{category}`."
+
+            # Select a random question
+            question = random.choice(questions)
+
+            # Store the active game
+            start_time = asyncio.get_event_loop().time()
+            self._trivia_games[channel_id] = {
+                "question": question,
+                "category": category,
+                "start_time": start_time,
+                "attempts": 0,
+            }
+            logger.info(
+                f"Stored trivia game in channel {channel_id}, start_time: {start_time}"
+            )
+
+            # Format the trivia question
+            difficulty_emoji = {1: "🟢", 2: "🟡", 3: "🔴"}
+            difficulty_text = {1: "Easy", 2: "Medium", 3: "Hard"}
+
+            diff_level = question.get("difficulty", 1)
+
+            trivia_message = f"""**🎮 TRIVIA TIME! 🎮**
+
+📚 **Category:** {category}
+{difficulty_emoji.get(diff_level, "🟢")} **Difficulty:** {difficulty_text.get(diff_level, "Easy")}
+
+**❓ Question:**
+{question["question_text"]}
+
+⏱️ You have 60 seconds to answer! Just type your answer in chat.
+
+💡 *Hint: The answer has {len(question["answer_text"])} characters*"""
+
+            # Post the question to the channel using the Discord tools if available
+            if self.discord_tools:
+                try:
+                    # Sanitize message to handle ampersands and other special characters before validation
+                    sanitized_message = trivia_message.replace('&', 'and').replace('&amp;', 'and')
+
+                    # Send the trivia question to the specified channel
+                    # Need to await the coroutine since discord_tools.send_message is async
+                    send_result = await self.discord_tools.send_message(
+                        channel_id=channel_id, content=sanitized_message
+                    )
+
+                    # Check if message was sent successfully
+                    if (
+                        isinstance(send_result, dict)
+                        and send_result.get("status") == "sent"
+                    ):
+                        return "TRIVIA_POSTED_SUCCESSFULLY"
+                    else:
+                        logger.error(f"Failed to send trivia message: {send_result}")
+                        # Fallback - return the trivia message in case AI tries to send it manually
+                        return trivia_message
+                except Exception as e:
+                    logger.error(f"Error sending trivia question to Discord: {e}")
+                    # Fallback - return the trivia message in case AI tries to send it manually
+                    return trivia_message
+            else:
+                # If no Discord tools available, return the message for AI to handle
+                return trivia_message
+
+        except Exception as e:
+            logger.error(f"Error in play_trivia: {e}")
+            return f"❌ Error starting trivia game: {str(e)}"
+
+    def check_trivia_answer(self, channel_id: str, user_answer: str) -> tuple:
+        """Check if a user's answer to the active trivia game is correct
+
+        Args:
+            channel_id: Discord channel ID
+            user_answer: User's answer attempt
+
+        Returns:
+            Tuple of (is_correct: bool, correct_answer: str, game_ended: bool)
+        """
+        if not hasattr(self, "_trivia_games"):
+            logger.debug(
+                f"_trivia_games not initialized when checking channel {channel_id}"
+            )
+            return False, "", False
+
+        logger.debug(
+            f"Checking trivia answer for channel {channel_id}, active games: {len(self._trivia_games) if hasattr(self, '_trivia_games') else 0}"
+        )
+
+        game = self._trivia_games.get(channel_id)
+        if not game:
+            logger.debug(f"No active trivia game in channel {channel_id}")
+            return False, "", False
+
+        # Check if game has timed out
+        elapsed = asyncio.get_event_loop().time() - game["start_time"]
+        if elapsed > 60:
+            correct_answer = game["question"]["answer_text"]
+            if channel_id in self._trivia_games:
+                del self._trivia_games[channel_id]
+            return False, correct_answer, True
+
+        # Increment attempts
+        game["attempts"] += 1
+
+        # Get correct answer
+        correct_answer = game["question"]["answer_text"]
+
+        # Normalize for comparison
+        user_ans = user_answer.strip().lower()
+        correct_ans = correct_answer.strip().lower()
+
+        # Check various match conditions
+        is_correct = (
+            user_ans == correct_ans
+            or user_ans in correct_ans
+            or correct_ans in user_ans
+            or any(
+                word in correct_ans.split()
+                for word in user_ans.split()
+                if len(word) > 3
+            )
+        )
+
+        # End game if correct
+        if is_correct:
+            if channel_id in self._trivia_games:
+                del self._trivia_games[channel_id]
+            return True, correct_answer, True
+
+        return False, correct_answer, False
 
 
 # Async helper functions for MCP operations

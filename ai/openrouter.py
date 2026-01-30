@@ -336,7 +336,7 @@ class OpenRouterAPI:
         self,
         messages: List[Dict[str, str]],
         model: Optional[str] = None,
-        temperature: float = 0.7,
+        temperature: float = 1.0,
         max_tokens: int = 1000,
         tools: Optional[List[Dict[str, Any]]] = None,
         tool_choice: Optional[str] = None,
@@ -450,13 +450,11 @@ class OpenRouterAPI:
         if response_format is not None:
             payload["response_format"] = response_format
         
-        # Add reasoning configuration - disabled for all models per OpenRouter specifications
-        # Supports: enabled, effort (xhigh/high/medium/low/minimal/none), max_tokens, exclude
+        # Add reasoning configuration - only when explicitly specified
+        # Some models require reasoning to be enabled and don't accept it being disabled
         if reasoning is not None:
             payload["reasoning"] = reasoning
-        else:
-            # Default: disable reasoning for all models per OpenRouter specifications
-            payload["reasoning"] = {"enabled": False}
+        # When reasoning is None, don't add the parameter, allowing models to use their defaults
         
         # Add tools if supported by the model
         if tools and tool_choice:
@@ -513,7 +511,32 @@ class OpenRouterAPI:
                 
                 if response.status_code == 200:
                     result = response.json()
-                    # Track free model usage
+                    # Check if response contains an upstream error (even with HTTP 200)
+                    if isinstance(result, dict) and "error" in result:
+                        # Check if error is retriable (5xx errors from upstream)
+                        error_code = result.get("code")
+                        error_msg = result.get("error", "Unknown error")
+                        retriable_codes = [500, 502, 503, 504]
+
+                        if error_code and error_code in retriable_codes:
+                            # This is a retriable upstream error
+                            if attempt < max_retries:
+                                sleep_time = retry_delay * (2 ** attempt) + random.uniform(0, 1)
+                                logger.warning(
+                                    f"OpenRouter: Upstream error {error_code} ({error_msg}). "
+                                    f"Retrying in {sleep_time:.2f}s... (Attempt {attempt+2}/{max_retries+1})"
+                                )
+                                time.sleep(sleep_time)
+                                continue
+                            else:
+                                logger.error(f"OpenRouter: Upstream error {error_code} - Max retries reached")
+                                return {"error": error_msg, "code": error_code}
+                        else:
+                            # Non-retriable error
+                            logger.error(f"OpenRouter: API error - {error_msg}")
+                            return {"error": error_msg, "code": error_code}
+
+                    # Track free model usage for successful responses
                     if is_free:
                         self._record_free_request()
                     logger.debug(f"OpenRouter: Successful response from {model}")

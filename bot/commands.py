@@ -1,10 +1,11 @@
 import asyncio
 import logging
 import math
+import random
 import re
 import sqlite3
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Dict, Optional
 
 import discord
 import pytz
@@ -21,6 +22,8 @@ from utils.helpers import send_long_message
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
+
+# Trivia game manager will be handled by the tool manager
 
 
 def sanitize_error_message(error_message: str) -> str:
@@ -343,10 +346,11 @@ def setup_commands(bot):
  `%tipstats` - Show tip.cc statistics and earnings
  `%airdropstatus` - Show current airdrop configuration and status
 
- **🧠 TRIVIA COMMANDS:**
- `%seedtrivia` - Seed trivia database from external sources
- `%addtrivia <category> <question> <answer>` - Add custom trivia question
- `%triviastats` - Show trivia database statistics and health
+  **🧠 TRIVIA COMMANDS:**
+  `%trivia [category]` - Start an interactive trivia game in the current channel
+  `%seedtrivia` - Seed trivia database from external sources
+  `%addtrivia <category> <question> <answer>` - Add custom trivia question
+  `%triviastats` - Show trivia database statistics and health
 
  **🔧 MISC COMMANDS:**
  `%models` - List all available AI models
@@ -882,7 +886,9 @@ def setup_commands(bot):
                 )
             else:
                 response += f"❌ **OpenRouter AI**: {openrouter_health.get('error', 'Unknown error')}\n"
-                response += f"🔍 Status: `{openrouter_health.get('status', 'unknown')}`\n"
+                response += (
+                    f"🔍 Status: `{openrouter_health.get('status', 'unknown')}`\n"
+                )
 
             # Check model availability from OpenRouter
             openrouter_models = []
@@ -894,36 +900,36 @@ def setup_commands(bot):
 
             response += "\n🤖 **Available Models:**\n"
             if openrouter_models:
-                response += "**OpenRouter**: " + ", ".join(
-                    openrouter_models[:10]
-                )
+                response += "**OpenRouter**: " + ", ".join(openrouter_models[:10])
                 if len(openrouter_models) > 10:
                     response += f" (+{len(openrouter_models) - 10} more)"
             else:
                 response += "**OpenRouter**: No models available"
 
             response += f"\n🔧 **Current model**: `{bot.current_model}`\n"
-            
+
             # Add rate limit information
             try:
                 rate_status = openrouter_api.check_rate_limits()
                 limits = rate_status.get("limits")
-                
+
                 response += "\n📊 **Rate Limits:**\n"
                 response += f"• Per-minute: {rate_status['requests_per_min']}/{rate_status['rate_limit_per_min']}\n"
-                
+
                 if limits:
                     tier = "Free" if limits.get("is_free_tier") else "Paid"
                     response += f"• Tier: {tier}\n"
                     response += f"• Free requests today: {limits.get('free_requests_today', 0)}/{limits.get('free_requests_limit', '?')}\n"
-                    response += f"• Remaining: {limits.get('free_requests_remaining', '?')}\n"
-                    
+                    response += (
+                        f"• Remaining: {limits.get('free_requests_remaining', '?')}\n"
+                    )
+
                     if limits.get("usage_daily"):
                         response += f"• Credits used today: {limits.get('usage_daily', 0):.4f}\n"
-                
+
                 if not rate_status["can_request"]:
                     response += f"\n⚠️ **Rate Limited:** {rate_status['reason']}\n"
-                    
+
             except Exception as e:
                 logger.debug(f"Could not get rate limit info: {e}")
 
@@ -2464,6 +2470,7 @@ def setup_commands(bot):
 
                 # Check for model - get available models dynamically
                 from media.image_generator import image_generator
+
                 available_models = image_generator.get_available_models()
                 model_names = []
 
@@ -2594,11 +2601,14 @@ def setup_commands(bot):
         try:
             # Generate audio URL using OpenRouter text-to-speech
             import urllib.parse
+
             encoded_text = urllib.parse.quote(text)
             audio_url = f"https://api.openai.com/v1/audio/speech?model=tts-1&voice=nova&input={encoded_text}"
 
             # Send the result
-            response = f"**🔊 Audio Generated!**\n**Text:** {text}\n**Audio URL:** {audio_url}"
+            response = (
+                f"**🔊 Audio Generated!**\n**Text:** {text}\n**Audio URL:** {audio_url}"
+            )
 
             # Send long message without truncation
             await send_long_message(ctx.channel, response)
@@ -2934,6 +2944,38 @@ def setup_commands(bot):
 
         except Exception as e:
             await ctx.send(handle_command_error(e, ctx, "triviasearch"))
+
+    @bot.command(name="trivia")
+    async def trivia(ctx, category: str = None):
+        """Start an interactive trivia game in the current channel
+
+        Usage:
+            %trivia - Random category
+            %trivia "Entertainment: Video Games" - Specific category
+            %trivia History - Single word category
+
+        The bot will post a question and monitor answers from anyone in the channel!
+        """
+        try:
+            # Use the tool manager's play_trivia function
+            if not hasattr(ctx.bot, "tool_manager") or not ctx.bot.tool_manager:
+                await ctx.send(
+                    "❌ Trivia system not initialized. Please try again later."
+                )
+                return
+
+            # Call the trivia tool
+            result = await ctx.bot.tool_manager.play_trivia(
+                channel_id=str(ctx.channel.id), category=category
+            )
+
+            # Only send the result if it's an error message or if the trivia wasn't posted via discord_tools
+            # Success messages start with "🎮 Trivia question posted" - don't send those as they're redundant
+            if result and not result.startswith("🎮 Trivia question posted"):
+                await ctx.send(result)
+
+        except Exception as e:
+            await ctx.send(handle_command_error(e, ctx, "trivia"))
 
     # ==========================================
     # CLEAR CACHE COMMAND (1 command)
