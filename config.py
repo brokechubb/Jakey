@@ -28,25 +28,23 @@ OPENROUTER_APP_NAME = os.getenv("OPENROUTER_APP_NAME", "Jakey")
 # =============================================================================
 
 # Primary model for all operations
-# NOTE: nemotron models have mandatory reasoning and return empty content - avoid as primary
-# NOTE: arcee-ai/trinity-mini:free has frequent Clarifai errors as of Jan 2026
-PRIMARY_MODEL = "qwen/qwen3-coder:free"
+# User's preferred models (Jan 2026)
+PRIMARY_MODEL = "nvidia/nemotron-nano-9b-v2:free"
 
 # Fallback models tried in order if primary fails (also used for function calling)
-# Updated Jan 2026 - removed arcee-ai/trinity-mini due to frequent errors
+# Note: nemotron models have mandatory reasoning (content goes to reasoning field)
 FALLBACK_MODELS = [
-    "qwen/qwen3-coder:free",
+    "meta-llama/llama-3.3-70b-instruct:free",
     "openai/gpt-oss-120b:free",
-    "tngtech/deepseek-r1t2-chimera:free",
+    "mistralai/mistral-small-3.1-24b-instruct:free",
 ]
 
 # Models for %models command display
-# Updated Jan 2026 with latest best free models for tool calling and conversation
 RECOMMENDED_MODELS = [
-    ("qwen/qwen3-coder:free", "Default - Excellent tool calling and coding, very fast"),
-    ("tngtech/deepseek-r1t2-chimera:free", "Top free model - Strong reasoning, optimized for agentic tasks"),
-    ("arcee-ai/trinity-large-preview:free", "Frontier-scale 400B MoE with excellent tool use"),
-    ("openai/gpt-oss-120b:free", "Large 120B MoE model with native tool use"),
+    ("nvidia/nemotron-nano-9b-v2:free", "Small but capable - best free model"),
+    ("meta-llama/llama-3.3-70b-instruct:free", "Meta's top instruct model - multilingual"),
+    ("openai/gpt-oss-120b:free", "OpenAI's open-weight 120B MoE model"),
+    ("mistralai/mistral-small-3.1-24b-instruct:free", "Fast 24B instruct model"),
 ]
 
 # Models where we should try to disable reasoning (they return empty content otherwise)
