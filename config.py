@@ -33,17 +33,20 @@ OPENROUTER_APP_NAME = os.getenv("OPENROUTER_APP_NAME", "Jakey")
 PRIMARY_MODEL = "qwen/qwen3-coder:free"
 
 # Fallback models tried in order if primary fails (also used for function calling)
+# Updated Jan 2026 - removed arcee-ai/trinity-mini due to frequent errors
 FALLBACK_MODELS = [
     "qwen/qwen3-coder:free",
     "openai/gpt-oss-120b:free",
-    "arcee-ai/trinity-mini:free",
+    "tngtech/deepseek-r1t2-chimera:free",
 ]
 
 # Models for %models command display
+# Updated Jan 2026 with latest best free models for tool calling and conversation
 RECOMMENDED_MODELS = [
-    ("qwen/qwen3-coder:free", "Default - Very fast and good at tool calling"),
-    ("arcee-ai/trinity-mini:free", "26B MoE with 3B active, good balance"),
-    ("openai/gpt-oss-120b:free", "Large 120B MoE model"),
+    ("qwen/qwen3-coder:free", "Default - Excellent tool calling and coding, very fast"),
+    ("tngtech/deepseek-r1t2-chimera:free", "Top free model - Strong reasoning, optimized for agentic tasks"),
+    ("arcee-ai/trinity-large-preview:free", "Frontier-scale 400B MoE with excellent tool use"),
+    ("openai/gpt-oss-120b:free", "Large 120B MoE model with native tool use"),
 ]
 
 # Models where we should try to disable reasoning (they return empty content otherwise)
