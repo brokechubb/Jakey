@@ -28,16 +28,22 @@ OPENROUTER_APP_NAME = os.getenv("OPENROUTER_APP_NAME", "Jakey")
 # =============================================================================
 
 # Primary model for all operations
-PRIMARY_MODEL = "meta-llama/llama-3.3-70b-instruct:free"
+# Updated Jan 2026 with verified tool-capable free models
+PRIMARY_MODEL = "tngtech/deepseek-r1t2-chimera:free"
 
 # Fallback models tried in order if primary fails (also used for function calling)
 FALLBACK_MODELS = [
-    # Will add fallback once primary works
+    "qwen/qwen3-coder:free",  # Best for tool calling
+    "openai/gpt-oss-120b:free",  # Native tool use
+    "meta-llama/llama-3.3-70b-instruct:free",  # Reliable instruct model
 ]
 
 # Models for %models command display
 RECOMMENDED_MODELS = [
-    ("meta-llama/llama-3.3-70b-instruct:free", "Meta's top instruct model"),
+    ("tngtech/deepseek-r1t2-chimera:free", "671B MoE - Strong reasoning & tool use"),
+    ("qwen/qwen3-coder:free", "480B MoE - Best for coding & tool calling"),
+    ("openai/gpt-oss-120b:free", "120B MoE - Native function calling"),
+    ("meta-llama/llama-3.3-70b-instruct:free", "70B - Reliable multilingual"),
 ]
 
 # Models where we should try to disable reasoning (they return empty content otherwise)
