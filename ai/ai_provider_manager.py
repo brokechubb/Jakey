@@ -1,6 +1,5 @@
 """
 AI Provider integration - OpenRouter only.
-Pollinations has been removed as the text models are no longer compatible.
 """
 
 import asyncio
@@ -9,13 +8,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
 from ai.openrouter import openrouter_api
-from config import (
-    OPENROUTER_DEFAULT_MODEL,
-    WEB_SEARCH_MODEL,
-    WORKING_MODELS,
-    BROKEN_MODELS,
-    FALLBACK_MODELS,
-)
+from config import OPENROUTER_DEFAULT_MODEL, FALLBACK_MODELS, DISABLE_REASONING_MODELS
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -55,20 +48,10 @@ class SimpleAIProviderManager:
             "provider_usage": {"openrouter": 0},
         }
 
-        # Validate and fix the default model if it's a known broken model
-        self.default_model = self._validate_model(OPENROUTER_DEFAULT_MODEL)
-        
-        # User model preferences
+        self.default_model = OPENROUTER_DEFAULT_MODEL
         self.user_model_preferences = {}  # user_id -> model preference
         
         logger.info("Simple AI Provider Manager initialized (OpenRouter only)")
-
-    def _validate_model(self, model: str) -> str:
-        """Validate model and replace if it's known to be broken."""
-        if model in BROKEN_MODELS:
-            logger.warning(f"Replacing broken model '{model}' with working model '{WORKING_MODELS[0]}'")
-            return WORKING_MODELS[0]
-        return model
 
     async def check_provider_health(self, provider_name: str) -> ProviderStatus:
         """Check health of a specific provider."""
@@ -148,33 +131,29 @@ class SimpleAIProviderManager:
 
         try:
             request_start = time.time()
-            # Only pass reasoning parameter if specifically requested in kwargs
-            # Otherwise, let OpenRouter handle reasoning per model defaults
+            # Handle reasoning parameter
+            # Some models (nemotron) default to reasoning mode and return empty content
+            # Try to disable reasoning for those models unless explicitly requested
             api_kwargs = kwargs.copy()
-            if 'reasoning' not in api_kwargs:
-                result = await asyncio.to_thread(
-                    self.openrouter_api.generate_text,
-                    messages=messages,
-                    model=model,
-                    temperature=temperature,
-                    max_tokens=max_tokens,
-                    tools=tools,
-                    tool_choice=tool_choice,
-                    **api_kwargs,  # reasoning not specified, so model uses its default
-                )
-            else:
-                # Only pass reasoning if explicitly provided
-                result = await asyncio.to_thread(
-                    self.openrouter_api.generate_text,
-                    messages=messages,
-                    model=model,
-                    temperature=temperature,
-                    max_tokens=max_tokens,
-                    tools=tools,
-                    tool_choice=tool_choice,
-                    reasoning=api_kwargs.pop('reasoning'),
-                    **api_kwargs,
-                )
+            reasoning_param = api_kwargs.pop('reasoning', None)
+            
+            # Auto-disable reasoning for models that default to it (and support disabling)
+            effective_model = model or self.default_model
+            if reasoning_param is None and effective_model in DISABLE_REASONING_MODELS:
+                reasoning_param = {"effort": "none"}
+                logger.info(f"Auto-disabling reasoning for {effective_model}")
+            
+            result = await asyncio.to_thread(
+                self.openrouter_api.generate_text,
+                messages=messages,
+                model=model,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                tools=tools,
+                tool_choice=tool_choice,
+                reasoning=reasoning_param,
+                **api_kwargs,
+            )
 
             request_time = time.time() - request_start
             logger.debug(f"OpenRouter API call completed in {request_time:.2f}s")
@@ -195,82 +174,6 @@ class SimpleAIProviderManager:
             response_time = time.time() - start_time
             error_msg = str(e)
             logger.error(f"Text generation failed: {error_msg}")
-            return {"error": error_msg}
-
-    async def generate_text_for_web_search(
-        self,
-        messages: List[Dict[str, Any]],
-        temperature: float = 0.3,
-        max_tokens: int = 800,
-        **kwargs,
-    ) -> Dict[str, Any]:
-        """
-        Generate text using a specific model optimized for web search responses.
-        Uses a model that doesn't have reasoning/output separation issues.
-
-        Args:
-            messages: List of message dictionaries
-            temperature: Lower temperature for focused responses
-            max_tokens: Maximum tokens to generate
-            **kwargs: Additional parameters
-
-        Returns:
-            Generated text response
-        """
-        start_time = time.time()
-        self.stats["total_requests"] += 1
-
-        logger.debug(f"Web search API request with model: {WEB_SEARCH_MODEL}")
-
-        try:
-            request_start = time.time()
-            # Only pass reasoning parameter if specifically requested in kwargs
-            # Otherwise, let OpenRouter handle reasoning per model defaults
-            api_kwargs = kwargs.copy()
-            if 'reasoning' not in api_kwargs:
-                result = await asyncio.to_thread(
-                    self.openrouter_api.generate_text,
-                    messages=messages,
-                    model=WEB_SEARCH_MODEL,
-                    temperature=temperature,
-                    max_tokens=max_tokens,
-                    tools=None,
-                    tool_choice=None,
-                    **api_kwargs,  # reasoning not specified, so model uses its default
-                )
-            else:
-                # Only pass reasoning if explicitly provided
-                result = await asyncio.to_thread(
-                    self.openrouter_api.generate_text,
-                    messages=messages,
-                    model=WEB_SEARCH_MODEL,
-                    temperature=temperature,
-                    max_tokens=max_tokens,
-                    tools=None,
-                    tool_choice=None,
-                    reasoning=api_kwargs.pop('reasoning'),
-                    **api_kwargs,
-                )
-
-            request_time = time.time() - request_start
-            logger.debug(f"Web search API call completed in {request_time:.2f}s")
-
-            if isinstance(result, dict) and "error" in result:
-                logger.error(f"Web search OpenRouter error: {result['error']}")
-                return result
-
-            response_time = time.time() - start_time
-            self.stats["successful_requests"] += 1
-            self.stats["provider_usage"]["openrouter"] += 1
-
-            logger.info(f"Web search text generated via {WEB_SEARCH_MODEL} ({response_time:.2f}s)")
-
-            return result
-
-        except Exception as e:
-            response_time = time.time() - start_time
-            error_msg = str(e)
-            logger.error(f"Web search text generation failed: {error_msg}")
             return {"error": error_msg}
 
     async def generate_image(

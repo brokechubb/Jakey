@@ -46,6 +46,23 @@ TOOL_CALL_TAG_PATTERN = re.compile(r"</?tool_call>.*", re.DOTALL | re.IGNORECASE
 FUNCTION_CALL_TAG_PATTERN = re.compile(
     r"</?function_call>.*", re.DOTALL | re.IGNORECASE
 )
+
+# Thinking/reasoning block patterns that should be stripped from responses
+# These are internal chain-of-thought that shouldn't be shown to users
+THINKING_BLOCK_PATTERNS = [
+    re.compile(r"<thinking>.*?</thinking>", re.DOTALL | re.IGNORECASE),
+    re.compile(r"<thought>.*?</thought>", re.DOTALL | re.IGNORECASE),
+    re.compile(r"<reasoning>.*?</reasoning>", re.DOTALL | re.IGNORECASE),
+    re.compile(r"<internal>.*?</internal>", re.DOTALL | re.IGNORECASE),
+    re.compile(r"<scratchpad>.*?</scratchpad>", re.DOTALL | re.IGNORECASE),
+    re.compile(r"\[thinking\].*?\[/thinking\]", re.DOTALL | re.IGNORECASE),
+    re.compile(r"\[thought\].*?\[/thought\]", re.DOTALL | re.IGNORECASE),
+    re.compile(r"\*\*Thinking:\*\*.*?(?=\n\n|\*\*Response|\*\*Answer|$)", re.DOTALL | re.IGNORECASE),
+    re.compile(r"\*\*Internal reasoning:\*\*.*?(?=\n\n|\*\*Response|\*\*Answer|$)", re.DOTALL | re.IGNORECASE),
+    # Chain-of-thought markers
+    re.compile(r"^(?:Let me think|I need to|First,? I|Step \d+:).*?(?=\n\n[A-Z]|\n\n\*\*|$)", re.DOTALL | re.MULTILINE),
+]
+
 RAW_FUNCTION_PATTERN = re.compile(r"\b[a-z_]+\s*\{[^}]*\}", re.IGNORECASE)
 DISCORD_FUNCTION_PATTERN = re.compile(
     r"\bdiscord_\w+\s*\{.*?\}", re.DOTALL | re.IGNORECASE
@@ -241,10 +258,12 @@ def sanitize_error_message(error_message: str) -> str:
 
 def sanitize_ai_response(response: str) -> str:
     """
-    Remove leaked tool call syntax from AI responses before sending to Discord.
+    Remove leaked tool call syntax and thinking blocks from AI responses before sending to Discord.
 
     Some AI models output raw tool call syntax like [TOOL_CALLS]function{...}
     instead of using proper API tool call format. This strips that text.
+    
+    Also removes thinking/reasoning blocks that models sometimes include in responses.
 
     NOTE: We intentionally do NOT strip URLs - image generation tools return URLs
     that need to be included in the response for Discord to embed them.
@@ -253,6 +272,11 @@ def sanitize_ai_response(response: str) -> str:
         return response
 
     sanitized = response
+
+    # Remove thinking/reasoning blocks first (before other sanitization)
+    # These are internal chain-of-thought that shouldn't be shown to users
+    for pattern in THINKING_BLOCK_PATTERNS:
+        sanitized = pattern.sub("", sanitized)
 
     # Remove [TOOL_CALLS] or similar patterns followed by function calls
     sanitized = TOOL_CALLS_PATTERN.sub("", sanitized)
@@ -288,7 +312,7 @@ def sanitize_ai_response(response: str) -> str:
     # Log if we removed significant content
     if len(response) - len(sanitized) > 20:
         logger.info(
-            f"Sanitized AI response: removed {len(response) - len(sanitized)} chars of tool call syntax"
+            f"Sanitized AI response: removed {len(response) - len(sanitized)} chars of tool call/thinking syntax"
         )
 
     return sanitized
@@ -296,96 +320,15 @@ def sanitize_ai_response(response: str) -> str:
 
 def extract_final_response_from_reasoning(reasoning: str) -> str:
     """
-    Extract the actual user-facing response from a model's reasoning/thinking output.
-
-    Many reasoning models output chain-of-thought that includes internal thinking
-    followed by the actual response. This function tries to extract just the final response.
-
-    Common patterns:
-    - "Final answer: ..." or "Final response: ..."
-    - "Response: ..." or "Answer: ..."
-    - "I'll respond with: ..."
-    - Text after "---" or "===" dividers
-    - Last paragraph after internal deliberation
+    Extract response from reasoning output when model puts content there instead of 'content'.
+    Tries multiple extraction strategies, falling back to using the full reasoning if needed.
     """
     if not reasoning:
         return ""
 
-    # Try to find explicit response markers (case insensitive)
-    response_patterns = [
-        r"(?:^|\n)\s*(?:Final )?[Rr]esponse\s*:\s*(.+?)$",
-        r"(?:^|\n)\s*(?:Final )?[Aa]nswer\s*:\s*(.+?)$",
-        r"(?:^|\n)\s*(?:My )?[Rr]eply\s*:\s*(.+?)$",
-        r'(?:^|\n)\s*I(?:\'ll| will) (?:respond|reply|say)\s*:\s*["\']?(.+?)["\']?\s*$',
-        r'(?:^|\n)\s*(?:So,? )?(?:I(?:\'ll| will| should) )?(?:just )?(?:say|respond|reply)\s*:\s*["\']?(.+?)["\']?\s*$',
-    ]
+    reasoning = reasoning.strip()
 
-    for pattern in response_patterns:
-        match = re.search(pattern, reasoning, re.DOTALL | re.MULTILINE)
-        if match:
-            response = match.group(1).strip()
-            if response:
-                return response
-
-    # Try to find content after dividers like "---" or "==="
-    divider_patterns = [r"\n-{3,}\n(.+?)$", r"\n={3,}\n(.+?)$", r"\n\*{3,}\n(.+?)$"]
-    for pattern in divider_patterns:
-        match = re.search(pattern, reasoning, re.DOTALL)
-        if match:
-            response = match.group(1).strip()
-            if response and len(response) > 20:  # Reasonable length check
-                return response
-
-    # Look for quoted response at the end
-    quoted_match = re.search(r'["\']([^"\']{20,})["\']\s*$', reasoning)
-    if quoted_match:
-        return quoted_match.group(1).strip()
-
-    # If reasoning contains clear thinking markers, try to get content after them
-    thinking_end_patterns = [
-        r"(?:Let me|I\'ll|I will|I should|Now I\'ll|So I\'ll)\s+(?:respond|reply|answer|say)[^.]*\.\s*(.+?)$",
-    ]
-    for pattern in thinking_end_patterns:
-        match = re.search(pattern, reasoning, re.DOTALL | re.IGNORECASE)
-        if match:
-            response = match.group(1).strip()
-            if response and len(response) > 10:
-                return response
-
-    # Look for "Therefore", "So", "In conclusion", "The answer is" patterns
-    conclusion_patterns = [
-        r"(?:Therefore|So|Thus|Hence|In conclusion|The (?:answer|response) is|Based on this):?\s*(.+?)(?:\n|$)",
-        r"(?:Therefore|So|Thus|Hence|In conclusion|The (?:answer|response) is|Based on this):?\s*(.+?)(?:\n[A-Z]|\n\n|$)",
-        r".*\n\n(.+?)(?:\n|$)",  # Last paragraph after double newline
-    ]
-    for pattern in conclusion_patterns:
-        match = re.search(pattern, reasoning, re.DOTALL | re.IGNORECASE)
-        if match:
-            response = match.group(1).strip()
-            if response and len(response) > 10:
-                # Avoid returning just thinking/analysis
-                thinking_indicators = [
-                    "let me",
-                    "i need to",
-                    "i should",
-                    "first,",
-                    "step 1",
-                    "let's",
-                    "we need to",
-                    "we should",
-                    "analyzing",
-                    "parsing",
-                    "considering",
-                    "the user",
-                    "the request",
-                    "this means",
-                    "this is",
-                ]
-                if not any(ind in response.lower() for ind in thinking_indicators):
-                    return response
-
-    # Last resort: if it's short enough and doesn't look like thinking, use as-is
-    # Chain-of-thought usually has phrases like "Let me", "I need to", "First,", etc.
+    # Thinking indicators that suggest internal chain-of-thought, not final answer
     thinking_indicators = [
         "let me",
         "i need to",
@@ -398,24 +341,95 @@ def extract_final_response_from_reasoning(reasoning: str) -> str:
         "analyzing",
         "parsing",
         "considering",
-        "the user",
-        "the request",
-        "this means",
-        "this is",
+        "i will start by",
+        "i'll start by",
+        "the response should be",
+        "i'll search",
+        "let's check",
+        "the user just said",
+        "i should check",
+        "based on the context",
+        "i need to figure out",
     ]
 
+    # Strategy 1: Look for explicit "Response:", "Answer:", "Reply:" markers
+    for marker in ["Response:", "Answer:", "Reply:", "Final response:", "Final answer:"]:
+        if marker.lower() in reasoning.lower():
+            idx = reasoning.lower().find(marker.lower())
+            response = reasoning[idx + len(marker):].strip()
+            # Take first paragraph after marker
+            if "\n\n" in response:
+                response = response.split("\n\n")[0].strip()
+            if response and len(response) > 10:
+                logger.debug(f"Extracted via '{marker}' marker")
+                return response
+
+    # Strategy 2: Try regex patterns for explicit response markers
+    response_patterns = [
+        r"(?:^|\n)\s*(?:Final )?[Rr]esponse\s*:\s*(.+?)$",
+        r"(?:^|\n)\s*(?:Final )?[Aa]nswer\s*:\s*(.+?)$",
+        r"(?:^|\n)\s*(?:My )?[Rr]eply\s*:\s*(.+?)$",
+        r'(?:^|\n)\s*I(?:\'ll| will) (?:respond|reply|say)\s*:\s*["\']?(.+?)["\']?\s*$',
+    ]
+    for pattern in response_patterns:
+        match = re.search(pattern, reasoning, re.DOTALL | re.MULTILINE)
+        if match:
+            response = match.group(1).strip()
+            if response and len(response) > 10:
+                logger.debug(f"Extracted via regex pattern")
+                return response
+
+    # Strategy 3: Look for content after dividers (---, ===, ***)
+    divider_patterns = [r"\n-{3,}\n(.+?)$", r"\n={3,}\n(.+?)$", r"\n\*{3,}\n(.+?)$"]
+    for pattern in divider_patterns:
+        match = re.search(pattern, reasoning, re.DOTALL)
+        if match:
+            response = match.group(1).strip()
+            if response and len(response) > 20:
+                logger.debug(f"Extracted via divider pattern")
+                return response
+
+    # Strategy 4: Look for quoted response at the end
+    quoted_match = re.search(r'["\']([^"\']{20,})["\']\s*$', reasoning)
+    if quoted_match:
+        logger.debug(f"Extracted via quoted text")
+        return quoted_match.group(1).strip()
+
+    # Strategy 5: Look for conclusion patterns
+    conclusion_patterns = [
+        r"(?:Therefore|Thus|Hence|In conclusion|The (?:answer|response) is):?\s*(.+?)(?:\n\n|$)",
+    ]
+    for pattern in conclusion_patterns:
+        match = re.search(pattern, reasoning, re.DOTALL | re.IGNORECASE)
+        if match:
+            response = match.group(1).strip()
+            if response and len(response) > 10:
+                if not any(ind in response.lower() for ind in thinking_indicators):
+                    logger.debug(f"Extracted via conclusion pattern")
+                    return response
+
+    # Strategy 6: Get last paragraph (often contains the actual response)
+    paragraphs = reasoning.split("\n\n")
+    if len(paragraphs) > 1:
+        last_para = paragraphs[-1].strip()
+        # Check if last paragraph looks like a response (not thinking)
+        if last_para and len(last_para) > 20:
+            last_para_lower = last_para.lower()
+            if not any(last_para_lower.startswith(ind) for ind in thinking_indicators):
+                logger.debug(f"Extracted via last paragraph")
+                return last_para
+
+    # Strategy 7: If short and doesn't look like thinking, use as-is
     reasoning_lower = reasoning.lower()
-    has_thinking_indicators = any(ind in reasoning_lower for ind in thinking_indicators)
+    has_thinking = any(ind in reasoning_lower for ind in thinking_indicators)
+    
+    if len(reasoning) < 500 and not has_thinking:
+        logger.debug(f"Using short reasoning as-is")
+        return reasoning
 
-    # If short and no clear thinking markers, might be the actual response
-    if len(reasoning) < 500 and not has_thinking_indicators:
-        return reasoning.strip()
-
-    # If we get here, the reasoning is likely pure chain-of-thought with no clear answer
-    # Return empty to indicate we couldn't extract a clean response
-    logger.warning(
-        f"Could not extract final response from reasoning (len={len(reasoning)})"
-    )
+    # Could not extract clean response - return empty
+    # The calling code will handle this (e.g., by re-prompting or showing error)
+    logger.warning(f"Could not extract response from reasoning (len={len(reasoning)}) - contains chain-of-thought")
     return ""
 
 
@@ -471,6 +485,7 @@ from config import (
     WEBHOOK_RELAY_MAPPINGS,
     WELCOME_CHANNEL_IDS,
     WELCOME_ENABLED,
+    WELCOME_MESSAGE_MODEL,
     WELCOME_SERVER_IDS,
 )
 from media.image_generator import image_generator
@@ -1674,25 +1689,16 @@ class JakeyBot(commands.Bot):
                 logger.info(f"AI message keys: {list(ai_message.keys())}")
 
                 # Some models put content in 'reasoning' field instead of 'content'
-                # But reasoning often contains internal chain-of-thought, not final answer
+                # But reasoning often contains internal chain-of-thought, not final answer.
+                # Per user request, we skip extraction and wait for a clean response 
+                # via the re-prompting logic below if content is empty.
                 if not ai_response and ai_message.get("reasoning"):
                     reasoning = ai_message.get("reasoning", "")
-                    reasoning_details = ai_message.get("reasoning_details", [])
                     logger.info(
-                        f"Model returned reasoning instead of content (len={len(reasoning)})"
+                        f"Model returned reasoning instead of content (len={len(reasoning)}). "
+                        "Waiting for re-prompt logic to obtain clean final response."
                     )
-
-                    # Try to extract actual response from reasoning
-                    ai_response = extract_final_response_from_reasoning(reasoning)
-
-                    if ai_response:
-                        logger.info(
-                            f"Extracted response from reasoning: {repr(ai_response[:200])}"
-                        )
-                    else:
-                        logger.warning(
-                            f"Could not extract clean response from reasoning"
-                        )
+                    # We leave ai_response empty so it triggers the follow-up logic below
 
                 # Log full message if still empty
                 if not ai_response:
@@ -1749,13 +1755,20 @@ class JakeyBot(commands.Bot):
                             function_name = function_info.get("name", "unknown")
 
                             # Parse arguments - may already be a dict or may be JSON string
+                            # Handle None case - some models return arguments: None
                             import json
 
                             args = function_info.get("arguments", {})
-                            if isinstance(args, str):
-                                arguments = json.loads(args)
+                            if args is None:
+                                arguments = {}
+                            elif isinstance(args, str):
+                                try:
+                                    arguments = json.loads(args) if args.strip() else {}
+                                except json.JSONDecodeError:
+                                    logger.warning(f"Failed to parse tool arguments as JSON: {args}")
+                                    arguments = {}
                             else:
-                                arguments = args
+                                arguments = args if args else {}
 
                             # Handle special "current" channel_id for Discord tools
                             channel_id_arg_names = ["channel_id", "channel"]
@@ -1784,13 +1797,36 @@ class JakeyBot(commands.Bot):
                                     except ValueError:
                                         pass  # Keep as string if not a valid number
 
-                            # Execute the tool
-                            logger.info(
-                                f"Executing tool: {function_name} with args: {arguments}"
-                            )
-                            result = await tool_manager.execute_tool(
-                                function_name, arguments, str(message.author.id)
-                            )
+                            # Validate required parameters for common tools
+                            # If model sent empty args for a tool that needs params, skip it
+                            TOOL_REQUIRED_PARAMS = {
+                                "web_search": ["query"],
+                                "company_research": ["company_name"],
+                                "crawling": ["url"],
+                                "get_crypto_price": ["symbol"],
+                                "generate_image": ["prompt"],
+                                "analyze_image": ["image_url"],
+                                "remember_user_info": ["user_id", "info"],
+                                "search_user_memory": ["user_id", "query"],
+                                "tip_user": ["recipient_id", "amount", "token"],
+                                "discord_send_message": ["channel_id", "content"],
+                                "discord_send_dm": ["user_id", "content"],
+                            }
+                            
+                            required = TOOL_REQUIRED_PARAMS.get(function_name, [])
+                            missing = [p for p in required if not arguments.get(p)]
+                            
+                            if missing:
+                                result = f"Error: Missing required parameters: {', '.join(missing)}"
+                                logger.warning(f"Tool {function_name} missing required params: {missing}, skipping execution")
+                            else:
+                                # Execute the tool
+                                logger.info(
+                                    f"Executing tool: {function_name} with args: {arguments}"
+                                )
+                                result = await tool_manager.execute_tool(
+                                    function_name, arguments, str(message.author.id)
+                                )
                             # Truncate result for logging
                             log_result = str(result)
                             if len(log_result) > 200:
@@ -1846,12 +1882,30 @@ class JakeyBot(commands.Bot):
 
                     # Update conversation history
                     if tool_messages:
+                        # Sanitize tool_calls before adding to history
+                        # Fix None arguments which cause API validation errors
+                        sanitized_tool_calls = []
+                        for tc in tool_calls:
+                            sanitized_tc = tc.copy()
+                            if "function" in sanitized_tc:
+                                func = sanitized_tc["function"].copy() if isinstance(sanitized_tc["function"], dict) else {}
+                                # Ensure arguments is a valid JSON string, not None
+                                args = func.get("arguments")
+                                if args is None:
+                                    func["arguments"] = "{}"
+                                elif isinstance(args, dict):
+                                    func["arguments"] = json.dumps(args)
+                                elif isinstance(args, str) and not args.strip():
+                                    func["arguments"] = "{}"
+                                sanitized_tc["function"] = func
+                            sanitized_tool_calls.append(sanitized_tc)
+
                         # Add the assistant message that requested the tools
                         valid_messages.append(
                             {
                                 "role": "assistant",
                                 "content": assistant_content,
-                                "tool_calls": tool_calls,
+                                "tool_calls": sanitized_tool_calls,
                             }
                         )
                         # Add the tool results
@@ -1875,40 +1929,16 @@ class JakeyBot(commands.Bot):
                             )
 
                         for attempt in range(max_retries):
-                            # Check if this is a web_search response - use dedicated model
-                            has_web_search = any(
-                                tc.get("function", {}).get("name") == "web_search"
-                                for tc in tool_calls
+                            final_response = await self._ai_manager.generate_text(
+                                messages=valid_messages,
+                                model=self.current_model,
+                                temperature=1.0,
+                                max_tokens=2000,
+                                tools=available_tools if not is_final_round else None,
+                                tool_choice=current_tool_choice,
+                                use_fallback_routing=True,
+                                user=str(message.author.id),
                             )
-
-                            if has_web_search and not is_final_round:
-                                final_response = (
-                                    await self._ai_manager.generate_text_for_web_search(
-                                        messages=valid_messages,
-                                        temperature=0.5,
-                                        max_tokens=1000,
-                                    )
-                                )
-                            else:
-                                final_response = await self._ai_manager.generate_text(
-                                    messages=valid_messages,
-                                    model=self.current_model,
-                                    temperature=1.0,
-                                    max_tokens=2000,
-                                    tools=available_tools
-                                    if not is_final_round
-                                    else None,
-                                    tool_choice=current_tool_choice,
-                                    # Anti-repetition parameters
-                                    repetition_penalty=1.15,
-                                    frequency_penalty=0.3,
-                                    presence_penalty=0.2,
-                                    use_fallback_routing=True,
-                                    user=str(message.author.id),
-                                    provider={
-                                        "ignore": ["OpenInference"]  # Exclude provider causing 502 errors
-                                    },
-                                )
 
                             if final_response.get("error"):
                                 error_msg = final_response.get("error", "")
@@ -1997,6 +2027,60 @@ class JakeyBot(commands.Bot):
                 logger.warning(
                     f"Response had no 'choices' key. Response keys: {response.keys()}"
                 )
+
+            if not ai_response:
+                # If we have reasoning but extraction failed, try one more call to get a final answer
+                # This ensures we don't show "dirty" reasoning and actually "wait till it's over"
+                reasoning_to_use = ""
+                if "ai_message" in locals() and ai_message.get("reasoning"):
+                    reasoning_to_use = ai_message.get("reasoning")
+                elif (
+                    "response" in locals()
+                    and isinstance(response, dict)
+                    and response.get("choices")
+                ):
+                    reasoning_to_use = response["choices"][0]["message"].get("reasoning")
+
+                if reasoning_to_use:
+                    logger.info(
+                        "Empty content but reasoning found. Re-prompting for final answer."
+                    )
+                    # Add reasoning to history so the model knows what it thought
+                    valid_messages.append(
+                        {"role": "assistant", "content": "", "reasoning": reasoning_to_use}
+                    )
+                    # Add a prompt to force the final answer
+                    valid_messages.append(
+                        {
+                            "role": "user",
+                            "content": "Based on your thoughts above, please provide a concise final response to the user. Do not include your thinking process, and do NOT use any prefixes or headers like 'Evil Jakey Responds:'. Just give the direct answer.",
+                        }
+                    )
+
+                    final_call = await self._ai_manager.generate_text(
+                        messages=valid_messages,
+                        model=self.current_model,
+                        temperature=0.7,
+                        max_tokens=1000,
+                        tools=None,
+                        tool_choice="none",
+                        use_fallback_routing=True,
+                        user=str(message.author.id),
+                    )
+
+                    if (
+                        final_call
+                        and "choices" in final_call
+                        and len(final_call["choices"]) > 0
+                    ):
+                        ai_response = (
+                            final_call["choices"][0]["message"]
+                            .get("content", "")
+                            .strip()
+                        )
+                        logger.info(
+                            f"Successfully obtained final answer via re-prompt (len={len(ai_response)})"
+                        )
 
             if not ai_response:
                 logger.warning(
@@ -3459,16 +3543,15 @@ class JakeyBot(commands.Bot):
                 self._ai_manager = ai_provider_manager
 
             logger.info(
-                f"🎯 Generating welcome message for {member.name} with model: {self.current_model}"
+                f"🎯 Generating welcome message for {member.name} with model: {WELCOME_MESSAGE_MODEL}"
             )
             logger.debug(f"📝 Welcome prompt: {custom_prompt[:200]}...")
 
             response = await self._ai_manager.generate_text(
                 messages=messages,
-                model=self.current_model,
-                max_tokens=500,
+                model=WELCOME_MESSAGE_MODEL,
+                max_tokens=300,
                 temperature=1.0,
-                reasoning={"exclude": True},
             )
 
             logger.debug(f"🤖 AI response received: {response}")
