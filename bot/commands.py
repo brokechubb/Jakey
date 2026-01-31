@@ -769,26 +769,15 @@ def setup_commands(bot):
             pass
 
         try:
-            # Recommended models for Jakey (best tool calling + conversation)
-            # Excluded: nvidia/nemotron-3-nano-30b-a3b (exposes thinking in reasoning field)
-            # Excluded: kwaipilot/kat-coder-pro (coding-focused, not ideal for chat)
-            # List is centralized in config.py as RECOMMENDED_MODELS
+            # Build concise model list
+            response = "**🤖 RECOMMENDED MODELS**\n"
+            response += "*Best for tool calling & conversation*\n\n"
 
-            response = "**RECOMMENDED MODELS FOR JAKEY**\n"
-            response += "*Models tested for clean responses and tool calling*\n\n"
-
-            response += "**Recommended:**\n"
             for model, desc in RECOMMENDED_MODELS:
-                response += f"• `{model}`\n  - {desc}\n"
+                response += f"`{model}` - {desc}\n"
 
-            response += "\n**Image Styles (Arta API):**\n"
-            response += "• **49 Artistic Styles** - Fantasy Art, Van Gogh, Photographic, Watercolor\n"
-            response += "• **9 Aspect Ratios** - 1:1, 16:9, 3:2, etc.\n"
-            response += "• Use `%imagemodels` for complete list\n"
-
-            response += "\n**USAGE:**\n"
-            response += "• `%model <model_name>` - Switch text model\n"
-            response += "• `%image [style] <prompt>` - Generate image\n"
+            response += "\n**🎨 Images:** `%image [style] <prompt>` - 49 styles via `%imagemodels`"
+            response += "\n**🔧 Switch:** `%model <name>` to change"
 
             await send_long_message(ctx.channel, response)
 
