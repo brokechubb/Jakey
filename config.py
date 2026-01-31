@@ -28,16 +28,15 @@ OPENROUTER_APP_NAME = os.getenv("OPENROUTER_APP_NAME", "Jakey")
 # =============================================================================
 
 # Primary model for all operations
-PRIMARY_MODEL = "openai/gpt-oss-120b:free"
+PRIMARY_MODEL = "meta-llama/llama-3.3-70b-instruct:free"
 
 # Fallback models tried in order if primary fails (also used for function calling)
 FALLBACK_MODELS = [
-    "meta-llama/llama-3.3-70b-instruct:free",
+    # Will add fallback once primary works
 ]
 
 # Models for %models command display
 RECOMMENDED_MODELS = [
-    ("openai/gpt-oss-120b:free", "OpenAI's open-weight 120B MoE"),
     ("meta-llama/llama-3.3-70b-instruct:free", "Meta's top instruct model"),
 ]
 
