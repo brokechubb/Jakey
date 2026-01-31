@@ -28,23 +28,19 @@ OPENROUTER_APP_NAME = os.getenv("OPENROUTER_APP_NAME", "Jakey")
 # =============================================================================
 
 # Primary model for all operations
-# User's preferred models (Jan 2026)
-PRIMARY_MODEL = "nvidia/nemotron-nano-9b-v2:free"
+PRIMARY_MODEL = "mistralai/mistral-small-3.1-24b-instruct:free"
 
 # Fallback models tried in order if primary fails (also used for function calling)
-# Note: nemotron models have mandatory reasoning (content goes to reasoning field)
 FALLBACK_MODELS = [
     "meta-llama/llama-3.3-70b-instruct:free",
     "openai/gpt-oss-120b:free",
-    "mistralai/mistral-small-3.1-24b-instruct:free",
 ]
 
 # Models for %models command display
 RECOMMENDED_MODELS = [
-    ("nvidia/nemotron-nano-9b-v2:free", "Small but capable - best free model"),
+    ("mistralai/mistral-small-3.1-24b-instruct:free", "Fast 24B instruct model - primary"),
     ("meta-llama/llama-3.3-70b-instruct:free", "Meta's top instruct model - multilingual"),
     ("openai/gpt-oss-120b:free", "OpenAI's open-weight 120B MoE model"),
-    ("mistralai/mistral-small-3.1-24b-instruct:free", "Fast 24B instruct model"),
 ]
 
 # Models where we should try to disable reasoning (they return empty content otherwise)
