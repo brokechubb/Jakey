@@ -28,7 +28,7 @@ OPENROUTER_APP_NAME = os.getenv("OPENROUTER_APP_NAME", "Jakey")
 # =============================================================================
 
 # Primary model for all operations
-PRIMARY_MODEL = "mistralai/mistral-small-3.1-24b-instruct:free"
+PRIMARY_MODEL = "qwen/qwen3-coder:free"
 
 # Fallback models tried in order if primary fails (also used for function calling)
 FALLBACK_MODELS = [
@@ -38,9 +38,9 @@ FALLBACK_MODELS = [
 
 # Models for %models command display
 RECOMMENDED_MODELS = [
-    ("mistralai/mistral-small-3.1-24b-instruct:free", "Fast 24B instruct model - primary"),
-    ("meta-llama/llama-3.3-70b-instruct:free", "Meta's top instruct model - multilingual"),
-    ("openai/gpt-oss-120b:free", "OpenAI's open-weight 120B MoE model"),
+    ("qwen/qwen3-coder:free", "Best tool calling - fast and reliable"),
+    ("meta-llama/llama-3.3-70b-instruct:free", "Meta's top instruct model"),
+    ("openai/gpt-oss-120b:free", "OpenAI's open-weight 120B MoE"),
 ]
 
 # Models where we should try to disable reasoning (they return empty content otherwise)
