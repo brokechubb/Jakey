@@ -57,10 +57,19 @@ THINKING_BLOCK_PATTERNS = [
     re.compile(r"<scratchpad>.*?</scratchpad>", re.DOTALL | re.IGNORECASE),
     re.compile(r"\[thinking\].*?\[/thinking\]", re.DOTALL | re.IGNORECASE),
     re.compile(r"\[thought\].*?\[/thought\]", re.DOTALL | re.IGNORECASE),
-    re.compile(r"\*\*Thinking:\*\*.*?(?=\n\n|\*\*Response|\*\*Answer|$)", re.DOTALL | re.IGNORECASE),
-    re.compile(r"\*\*Internal reasoning:\*\*.*?(?=\n\n|\*\*Response|\*\*Answer|$)", re.DOTALL | re.IGNORECASE),
+    re.compile(
+        r"\*\*Thinking:\*\*.*?(?=\n\n|\*\*Response|\*\*Answer|$)",
+        re.DOTALL | re.IGNORECASE,
+    ),
+    re.compile(
+        r"\*\*Internal reasoning:\*\*.*?(?=\n\n|\*\*Response|\*\*Answer|$)",
+        re.DOTALL | re.IGNORECASE,
+    ),
     # Chain-of-thought markers
-    re.compile(r"^(?:Let me think|I need to|First,? I|Step \d+:).*?(?=\n\n[A-Z]|\n\n\*\*|$)", re.DOTALL | re.MULTILINE),
+    re.compile(
+        r"^(?:Let me think|I need to|First,? I|Step \d+:).*?(?=\n\n[A-Z]|\n\n\*\*|$)",
+        re.DOTALL | re.MULTILINE,
+    ),
 ]
 
 RAW_FUNCTION_PATTERN = re.compile(r"\b[a-z_]+\s*\{[^}]*\}", re.IGNORECASE)
@@ -70,9 +79,7 @@ DISCORD_FUNCTION_PATTERN = re.compile(
 WEB_SEARCH_FUNCTION_PATTERN = re.compile(
     r"\bweb_search\s*\{.*?\}", re.DOTALL | re.IGNORECASE
 )
-URL_QUERY_PATTERN = re.compile(
-    r"\b(\w+)\s*\?([^\s]+)", re.IGNORECASE
-)
+URL_QUERY_PATTERN = re.compile(r"\b(\w+)\s*\?([^\s]+)", re.IGNORECASE)
 GET_FUNCTION_PATTERN = re.compile(r"\bget_\w+\s*\{.*?\}", re.DOTALL | re.IGNORECASE)
 REMEMBER_FUNCTION_PATTERN = re.compile(
     r"\bremember_\w+\s*\{.*?\}", re.DOTALL | re.IGNORECASE
@@ -80,9 +87,7 @@ REMEMBER_FUNCTION_PATTERN = re.compile(
 SEARCH_FUNCTION_PATTERN = re.compile(
     r"\bsearch_\w+\s*\{.*?\}", re.DOTALL | re.IGNORECASE
 )
-PYTHON_CALL_PATTERN = re.compile(
-    r"\b\w+\s*\([^)]*\)", re.IGNORECASE
-)
+PYTHON_CALL_PATTERN = re.compile(r"\b\w+\s*\([^)]*\)", re.IGNORECASE)
 JSON_TOOL_CALL_PATTERN = re.compile(
     r'\{[^}]*["\']type["\']\s*:\s*["\']function["\'][^{]*(?:\{[^}]*\})?[^}]*\}',
     re.DOTALL | re.IGNORECASE,
@@ -106,6 +111,7 @@ def extract_text_tool_calls(ai_response: str) -> Tuple[List[Dict], str]:
 
     # Get list of valid tool names to validate extractions
     from tools.tool_manager import tool_manager
+
     valid_tool_names = set()
     try:
         available_tools = tool_manager.get_available_tools()
@@ -160,6 +166,7 @@ def extract_text_tool_calls(ai_response: str) -> Tuple[List[Dict], str]:
 
             # Parse query string to parameters
             from urllib.parse import parse_qs
+
             params = parse_qs(query_string)
             # Handle single values (parse_qs returns lists)
             parameters = {k: v[0] if len(v) == 1 else v for k, v in params.items()}
@@ -191,17 +198,19 @@ def extract_text_tool_calls(ai_response: str) -> Tuple[List[Dict], str]:
             return tool_calls, cleaned_response
 
         except Exception as e:
-            logging.getLogger(__name__).debug(f"Failed to parse URL query tool call: {e}")
+            logging.getLogger(__name__).debug(
+                f"Failed to parse URL query tool call: {e}"
+            )
 
     # Try Python function call format (e.g., play_trivia(channel_id=123))
     match = PYTHON_CALL_PATTERN.search(ai_response)
     if match:
         try:
             full_match = match.group(0)
-            parts = full_match.split('(', 1)
+            parts = full_match.split("(", 1)
             if len(parts) == 2:
                 function_name = parts[0].strip()
-                params_str = parts[1].rstrip(')')
+                params_str = parts[1].rstrip(")")
 
                 # Validate that function name exists in available tools
                 if function_name not in valid_tool_names:
@@ -214,11 +223,14 @@ def extract_text_tool_calls(ai_response: str) -> Tuple[List[Dict], str]:
                 parameters = {}
                 if params_str:
                     import re
-                    param_pairs = re.findall(r'(\w+)=["\']?([^"\'\)]+)["\']?', params_str)
+
+                    param_pairs = re.findall(
+                        r'(\w+)=["\']?([^"\'\)]+)["\']?', params_str
+                    )
                     for key, value in param_pairs:
                         # Try to convert to int or float if possible
                         try:
-                            if '.' in value:
+                            if "." in value:
                                 value = float(value)
                             else:
                                 value = int(value)
@@ -240,7 +252,9 @@ def extract_text_tool_calls(ai_response: str) -> Tuple[List[Dict], str]:
                 return tool_calls, cleaned_response
 
         except Exception as e:
-            logging.getLogger(__name__).debug(f"Failed to parse Python function call: {e}")
+            logging.getLogger(__name__).debug(
+                f"Failed to parse Python function call: {e}"
+            )
 
     return [], ai_response
 
@@ -262,7 +276,7 @@ def sanitize_ai_response(response: str) -> str:
 
     Some AI models output raw tool call syntax like [TOOL_CALLS]function{...}
     instead of using proper API tool call format. This strips that text.
-    
+
     Also removes thinking/reasoning blocks that models sometimes include in responses.
 
     NOTE: We intentionally do NOT strip URLs - image generation tools return URLs
@@ -353,10 +367,16 @@ def extract_final_response_from_reasoning(reasoning: str) -> str:
     ]
 
     # Strategy 1: Look for explicit "Response:", "Answer:", "Reply:" markers
-    for marker in ["Response:", "Answer:", "Reply:", "Final response:", "Final answer:"]:
+    for marker in [
+        "Response:",
+        "Answer:",
+        "Reply:",
+        "Final response:",
+        "Final answer:",
+    ]:
         if marker.lower() in reasoning.lower():
             idx = reasoning.lower().find(marker.lower())
-            response = reasoning[idx + len(marker):].strip()
+            response = reasoning[idx + len(marker) :].strip()
             # Take first paragraph after marker
             if "\n\n" in response:
                 response = response.split("\n\n")[0].strip()
@@ -422,14 +442,16 @@ def extract_final_response_from_reasoning(reasoning: str) -> str:
     # Strategy 7: If short and doesn't look like thinking, use as-is
     reasoning_lower = reasoning.lower()
     has_thinking = any(ind in reasoning_lower for ind in thinking_indicators)
-    
+
     if len(reasoning) < 500 and not has_thinking:
         logger.debug(f"Using short reasoning as-is")
         return reasoning
 
     # Could not extract clean response - return empty
     # The calling code will handle this (e.g., by re-prompting or showing error)
-    logger.warning(f"Could not extract response from reasoning (len={len(reasoning)}) - contains chain-of-thought")
+    logger.warning(
+        f"Could not extract response from reasoning (len={len(reasoning)}) - contains chain-of-thought"
+    )
     return ""
 
 
@@ -1699,7 +1721,7 @@ class JakeyBot(commands.Bot):
 
                 # Some models put content in 'reasoning' field instead of 'content'
                 # But reasoning often contains internal chain-of-thought, not final answer.
-                # Per user request, we skip extraction and wait for a clean response 
+                # Per user request, we skip extraction and wait for a clean response
                 # via the re-prompting logic below if content is empty.
                 if not ai_response and ai_message.get("reasoning"):
                     reasoning = ai_message.get("reasoning", "")
@@ -1716,7 +1738,7 @@ class JakeyBot(commands.Bot):
                 # Log reasoning if present (DeepSeek style)
                 if ai_message.get("reasoning"):
                     logger.info(f"🧠 Model Reasoning: {ai_message.get('reasoning')}")
-                
+
                 # Check for embedded thinking in content (Claude/other style)
                 # We log this before it gets stripped later
                 for pattern in THINKING_BLOCK_PATTERNS:
@@ -1726,10 +1748,12 @@ class JakeyBot(commands.Bot):
 
                 # Handle tool calls if present
                 tool_calls = ai_message.get("tool_calls", [])
-                
+
                 # Log tool decision
                 if tool_calls:
-                    logger.info(f"✅ Model decided to use {len(tool_calls)} tool(s): {[tc.get('function', {}).get('name', 'unknown') for tc in tool_calls]}")
+                    logger.info(
+                        f"✅ Model decided to use {len(tool_calls)} tool(s): {[tc.get('function', {}).get('name', 'unknown') for tc in tool_calls]}"
+                    )
                 else:
                     logger.debug(f"ℹ️ Model chose NOT to use tools for this response")
 
@@ -1791,7 +1815,9 @@ class JakeyBot(commands.Bot):
                                 try:
                                     arguments = json.loads(args) if args.strip() else {}
                                 except json.JSONDecodeError:
-                                    logger.warning(f"Failed to parse tool arguments as JSON: {args}")
+                                    logger.warning(
+                                        f"Failed to parse tool arguments as JSON: {args}"
+                                    )
                                     arguments = {}
                             else:
                                 arguments = args if args else {}
@@ -1838,13 +1864,15 @@ class JakeyBot(commands.Bot):
                                 "discord_send_message": ["channel_id", "content"],
                                 "discord_send_dm": ["user_id", "content"],
                             }
-                            
+
                             required = TOOL_REQUIRED_PARAMS.get(function_name, [])
                             missing = [p for p in required if not arguments.get(p)]
-                            
+
                             if missing:
                                 result = f"Error: Missing required parameters: {', '.join(missing)}"
-                                logger.warning(f"Tool {function_name} missing required params: {missing}, skipping execution")
+                                logger.warning(
+                                    f"Tool {function_name} missing required params: {missing}, skipping execution"
+                                )
                             else:
                                 # Execute the tool
                                 logger.info(
@@ -1869,24 +1897,6 @@ class JakeyBot(commands.Bot):
                                 logger.info(
                                     f"📸 Tracked generated image URL for response"
                                 )
-
-                            # Handle trivia success - skip AI follow-up response
-                            if (
-                                function_name == "play_trivia"
-                                and result == "TRIVIA_POSTED_SUCCESSFULLY"
-                            ):
-                                logger.info(
-                                    "Trivia posted successfully, skipping AI follow-up"
-                                )
-                                try:
-                                    await message.remove_reaction("🤔", self.user)
-                                except (
-                                    discord.NotFound,
-                                    discord.Forbidden,
-                                    discord.HTTPException,
-                                ):
-                                    pass
-                                return  # Exit early - trivia question already posted to chat
 
                             # Add tool response
                             tool_messages.append(
@@ -1914,7 +1924,11 @@ class JakeyBot(commands.Bot):
                         for tc in tool_calls:
                             sanitized_tc = tc.copy()
                             if "function" in sanitized_tc:
-                                func = sanitized_tc["function"].copy() if isinstance(sanitized_tc["function"], dict) else {}
+                                func = (
+                                    sanitized_tc["function"].copy()
+                                    if isinstance(sanitized_tc["function"], dict)
+                                    else {}
+                                )
                                 # Ensure arguments is a valid JSON string, not None
                                 args = func.get("arguments")
                                 if args is None:
@@ -1938,7 +1952,9 @@ class JakeyBot(commands.Bot):
                         valid_messages.extend(tool_messages)
 
                         # Generate follow-up response
-                        max_retries = 5  # Increased from 2 to handle transient 502 errors
+                        max_retries = (
+                            5  # Increased from 2 to handle transient 502 errors
+                        )
                         retry_delay = 1.0
                         final_response = None
 
@@ -2033,7 +2049,7 @@ class JakeyBot(commands.Bot):
                                     logger.info(
                                         f"✅ Converted text-based tool call in loop"
                                     )
-                                    
+
                             # SAFETY: If this was the final round (forced "none") but model still returned tools,
                             # we MUST ignore them to break the loop and use whatever text we have.
                             if is_final_round and tool_calls:
@@ -2076,7 +2092,9 @@ class JakeyBot(commands.Bot):
                     and isinstance(response, dict)
                     and response.get("choices")
                 ):
-                    reasoning_to_use = response["choices"][0]["message"].get("reasoning")
+                    reasoning_to_use = response["choices"][0]["message"].get(
+                        "reasoning"
+                    )
 
                 if reasoning_to_use:
                     logger.info(
@@ -2084,7 +2102,11 @@ class JakeyBot(commands.Bot):
                     )
                     # Add reasoning to history so the model knows what it thought
                     valid_messages.append(
-                        {"role": "assistant", "content": "", "reasoning": reasoning_to_use}
+                        {
+                            "role": "assistant",
+                            "content": "",
+                            "reasoning": reasoning_to_use,
+                        }
                     )
                     # Add a prompt to force the final answer
                     valid_messages.append(

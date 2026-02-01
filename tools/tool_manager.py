@@ -1585,7 +1585,7 @@ class ToolManager:
                         logger.info(
                             f"web_search success: {len(data['results'])} results for '{query[:50]}'"
                         )
-                        
+
                         # Add a strong system instruction to the results
                         search_output = "\n".join(results)
                         return (
@@ -1799,8 +1799,11 @@ class ToolManager:
         try:
             # Safe evaluation - allow alphanumeric characters and basic operators for flexible expressions
             # AST parsing below provides actual security - this validation just excludes truly dangerous characters
-            disallowed_pattern = r'[;\[\]{}"\'\\]'  # Reject: semicolons, brackets, quotes, backslash
+            disallowed_pattern = (
+                r'[;\[\]{}"\'\\]'  # Reject: semicolons, brackets, quotes, backslash
+            )
             import re
+
             if re.search(disallowed_pattern, expression):
                 return "Error: Expression contains characters that could indicate code execution attempts. Only use numbers, operators, letters, and basic punctuation."
 
@@ -2866,7 +2869,9 @@ class ToolManager:
                     difficulty = int(difficulty)
                 except ValueError:
                     # Handle string literals like "none" or invalid numeric strings
-                    logger.warning(f"Invalid difficulty value '{difficulty}', using None")
+                    logger.warning(
+                        f"Invalid difficulty value '{difficulty}', using None"
+                    )
                     difficulty = None
             # Import trivia manager
             import random
@@ -2955,7 +2960,9 @@ class ToolManager:
             if self.discord_tools:
                 try:
                     # Sanitize message to handle ampersands and other special characters before validation
-                    sanitized_message = trivia_message.replace('&', 'and').replace('&amp;', 'and')
+                    sanitized_message = trivia_message.replace("&", "and").replace(
+                        "&amp;", "and"
+                    )
 
                     # Send the trivia question to the specified channel
                     # Need to await the coroutine since discord_tools.send_message is async
@@ -2968,7 +2975,7 @@ class ToolManager:
                         isinstance(send_result, dict)
                         and send_result.get("status") == "sent"
                     ):
-                        return "TRIVIA_POSTED_SUCCESSFULLY"
+                        return "Trivia question has been posted successfully to the channel."
                     else:
                         logger.error(f"Failed to send trivia message: {send_result}")
                         # Fallback - return the trivia message in case AI tries to send it manually
