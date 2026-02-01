@@ -719,44 +719,86 @@ def setup_commands(bot):
         """Show or set the current AI model (admin only)"""
         # Check if user is admin
         if not is_admin(ctx.author.id):
-            await ctx.send("💀 Admin only command bro!")
+            await ctx.send("Admin only command bro!")
             return
 
+        from ai.openai_compatible import openai_compatible_api
+        from config import OPENAI_COMPAT_DEFAULT_MODEL, OPENAI_COMPAT_ENABLED
+
         if model_name is None:
-            # Show current model and available models
-            current_model = (
+            # Show current models for both providers
+            response = "**Current Models:**\n"
+
+            # Show local model if enabled
+            if OPENAI_COMPAT_ENABLED:
+                local_model = (
+                    bot.local_model
+                    if hasattr(bot, "local_model")
+                    else OPENAI_COMPAT_DEFAULT_MODEL
+                )
+                response += f"**Local:** `{local_model}`\n"
+
+            # Show OpenRouter model
+            openrouter_model = (
                 bot.current_model if hasattr(bot, "current_model") else "Not set"
             )
-            await ctx.send(
-                f"🤖 **Current model:** {current_model}\nUse `%model <model_name>` to change it."
-            )
+            response += f"**OpenRouter:** `{openrouter_model}`\n"
+
+            response += "\nUse `%model <model_name>` to change."
+            response += "\nUse `%models` to see available models."
+            await ctx.send(response)
             return
 
         try:
-            # Validate the model by checking if it exists in available models
-            try:
-                available_models = openrouter_api.list_models()
-            except:
-                available_models = FALLBACK_MODELS
+            # Check if the model is available in either provider
+            model_set = False
+            provider_name = None
 
-            if model_name in available_models:
-                bot.current_model = model_name
-                logger.info(f"Model changed to: {model_name} (user: {ctx.author.id})")
-                await ctx.send(f"💀 **Model updated to:** {model_name}")
+            # First check OpenAI-compatible models (local)
+            if OPENAI_COMPAT_ENABLED:
+                try:
+                    compat_models = openai_compatible_api.list_models()
+                    if model_name in compat_models:
+                        bot.local_model = model_name
+                        model_set = True
+                        provider_name = "Local"
+                        logger.info(
+                            f"Local model changed to: {model_name} (user: {ctx.author.id})"
+                        )
+                except Exception as e:
+                    logger.warning(f"Failed to check local models: {e}")
+
+            # Then check OpenRouter models
+            if not model_set:
+                try:
+                    available_models = openrouter_api.list_models()
+                except:
+                    available_models = FALLBACK_MODELS
+
+                if model_name in available_models:
+                    bot.current_model = model_name
+                    model_set = True
+                    provider_name = "OpenRouter"
+                    logger.info(
+                        f"OpenRouter model changed to: {model_name} (user: {ctx.author.id})"
+                    )
+
+            if model_set:
+                await ctx.send(f"**Model updated:** `{model_name}` ({provider_name})")
             else:
                 await ctx.send(
-                    f"💀 **Model '{model_name}' not found.** Use `%models` to see available models."
+                    f"**Model '{model_name}' not found.** Use `%models` to see available models."
                 )
 
         except Exception as e:
-            await ctx.send(f"💀 **Failed to set model:** {str(e)}")
+            await ctx.send(f"**Failed to set model:** {str(e)}")
 
     @bot.command(name="models")
     async def models(ctx):
         """List all available AI models with enhanced information"""
         # Check if user is admin
         if not is_admin(ctx.author.id):
-            await ctx.send("💀 Admin only command bro!")
+            await ctx.send("Admin only command bro!")
             return
 
         try:
@@ -769,15 +811,34 @@ def setup_commands(bot):
             pass
 
         try:
-            # Build concise model list
-            response = "**🤖 RECOMMENDED MODELS**\n"
+            from ai.openai_compatible import openai_compatible_api
+            from config import OPENAI_COMPAT_ENABLED
+
+            response = ""
+
+            # Show OpenAI-Compatible models if enabled
+            if OPENAI_COMPAT_ENABLED:
+                compat_models = openai_compatible_api.list_models()
+                if compat_models:
+                    response += "**LOCAL MODELS** (OpenAI-Compatible)\n"
+                    response += f"*Endpoint: {openai_compatible_api.api_url.replace('/chat/completions', '')}*\n\n"
+                    for model in compat_models[:15]:  # Limit to 15 models
+                        response += f"`{model}`\n"
+                    if len(compat_models) > 15:
+                        response += f"*...and {len(compat_models) - 15} more*\n"
+                    response += "\n"
+                else:
+                    response += "**LOCAL MODELS** - *Unavailable (connection failed)*\n\n"
+
+            # Show recommended OpenRouter models
+            response += "**OPENROUTER MODELS**\n"
             response += "*Best for tool calling & conversation*\n\n"
 
             for model, desc in RECOMMENDED_MODELS:
                 response += f"`{model}` - {desc}\n"
 
-            response += "\n**🎨 Images:** `%image [style] <prompt>` - 49 styles via `%imagemodels`"
-            response += "\n**🔧 Switch:** `%model <name>` to change"
+            response += "\n**Images:** `%image [style] <prompt>` - 49 styles via `%imagemodels`"
+            response += "\n**Switch:** `%model <name>` to change"
 
             await send_long_message(ctx.channel, response)
 

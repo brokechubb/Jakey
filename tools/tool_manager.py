@@ -1585,7 +1585,14 @@ class ToolManager:
                         logger.info(
                             f"web_search success: {len(data['results'])} results for '{query[:50]}'"
                         )
-                        return "\n".join(results)
+                        
+                        # Add a strong system instruction to the results
+                        search_output = "\n".join(results)
+                        return (
+                            f"SEARCH RESULTS FOR '{query}':\n{search_output}\n\n"
+                            "SYSTEM INSTRUCTION: SUMMARIZE THESE RESULTS IN 1-4 SENTENCES. "
+                            "DO NOT LIST THEM. DO NOT RAMBLE. JUST GIVE THE ANSWER."
+                        )
                     else:
                         logger.info(f"web_search no results for: {query}")
                         return f"No search results found for '{query}'."

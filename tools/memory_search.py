@@ -367,7 +367,7 @@ class MemorySearchTool:
                 
                 # Log performance metrics
                 search_time = time.time() - start_time
-                self.logger.debug(
+                self.logger.info(
                     f"Memory context retrieved in {search_time:.3f}s: "
                     f"{search_result.get('total_memories', 0)} memories for user {user_id}"
                 )

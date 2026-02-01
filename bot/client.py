@@ -1594,6 +1594,15 @@ class JakeyBot(commands.Bot):
             )
             system_content += current_context_info
 
+            # FORCE BREVITY: Add a final, unignorable instruction at the very end
+            system_content += (
+                "\n\n🛑 **FINAL INSTRUCTION:** "
+                "You are currently in 'Short Mode'. "
+                "Your response MUST be under 100 words. "
+                "Do NOT write more than 4 sentences. "
+                "If you write a paragraph, you have FAILED."
+            )
+
             messages = [
                 {"role": "system", "content": system_content},
             ]
@@ -1624,7 +1633,7 @@ class JakeyBot(commands.Bot):
                 messages=valid_messages,
                 model=self.current_model,
                 temperature=1.0,
-                max_tokens=500,
+                max_tokens=250,  # Reduced from 500 to force brevity (approx 200 words max)
                 tools=available_tools,
                 tool_choice="auto",
                 # Anti-repetition parameters from OpenRouter API
@@ -1704,8 +1713,25 @@ class JakeyBot(commands.Bot):
                 if not ai_response:
                     logger.warning(f"Full ai_message: {ai_message}")
 
+                # Log reasoning if present (DeepSeek style)
+                if ai_message.get("reasoning"):
+                    logger.info(f"🧠 Model Reasoning: {ai_message.get('reasoning')}")
+                
+                # Check for embedded thinking in content (Claude/other style)
+                # We log this before it gets stripped later
+                for pattern in THINKING_BLOCK_PATTERNS:
+                    match = pattern.search(ai_response)
+                    if match:
+                        logger.info(f"🧠 Embedded Thinking found: {match.group(0)}")
+
                 # Handle tool calls if present
                 tool_calls = ai_message.get("tool_calls", [])
+                
+                # Log tool decision
+                if tool_calls:
+                    logger.info(f"✅ Model decided to use {len(tool_calls)} tool(s): {[tc.get('function', {}).get('name', 'unknown') for tc in tool_calls]}")
+                else:
+                    logger.debug(f"ℹ️ Model chose NOT to use tools for this response")
 
                 # DEFENSIVE: Check if model returned tool call as JSON text in content instead of using API
                 if not tool_calls and ai_response:
@@ -2007,6 +2033,17 @@ class JakeyBot(commands.Bot):
                                     logger.info(
                                         f"✅ Converted text-based tool call in loop"
                                     )
+                                    
+                            # SAFETY: If this was the final round (forced "none") but model still returned tools,
+                            # we MUST ignore them to break the loop and use whatever text we have.
+                            if is_final_round and tool_calls:
+                                logger.warning(
+                                    f"⚠️ Model ignored tool_choice='none' in final round. Ignoring {len(tool_calls)} tool calls to prevent loop."
+                                )
+                                tool_calls = []
+                                # If content is empty, provide a fallback message
+                                if not ai_response:
+                                    ai_response = "*(I stopped because I was getting stuck in a loop)*"
                         else:
                             # No valid choices or error response structure
                             ai_response = final_response.get("content", "")
