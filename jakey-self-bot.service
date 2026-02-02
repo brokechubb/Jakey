@@ -10,6 +10,7 @@ Group=chubb
 WorkingDirectory=/home/chubb/bots/JakeySelfBot
 Environment=PYTHONUNBUFFERED=1
 Environment=PATH=/home/chubb/bots/JakeySelfBot/venv/bin:/usr/local/bin:/usr/bin:/bin
+Environment=REQUESTS_CA_BUNDLE=/home/chubb/bots/JakeySelfBot/venv/lib/python3.11/site-packages/certifi/cacert.pem
 ExecStartPre=/bin/bash -c 'cd /home/chubb/bots/JakeySelfBot && source venv/bin/activate && pip install -r requirements.txt'
 ExecStart=/home/chubb/bots/JakeySelfBot/venv/bin/python /home/chubb/bots/JakeySelfBot/main.py
 Restart=always

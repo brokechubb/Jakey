@@ -55,21 +55,31 @@ class MemorySearchTool:
             if query:
                 memories = await memory_backend.search(user_id, query, limit)
             else:
-                # Get all memories for the user
-                all_memories = await memory_backend.get_all(user_id)
+                # Get all memories for the user (more efficient than retrieve loop)
+                all_memories_dict = await memory_backend.get_all(user_id)
                 memories = []
                 
-                # Convert to MemoryEntry objects and filter by confidence
-                for key, value in all_memories.items():
-                    # Get metadata if available
-                    memory_entry = await memory_backend.retrieve(user_id, key)
-                    if memory_entry and memory_entry.metadata:
-                        confidence = memory_entry.metadata.get('confidence', 1.0)
-                        if confidence >= min_confidence:
-                            memories.append(memory_entry)
+                # Convert dict to MemoryEntry objects efficiently
+                for key, value in all_memories_dict.items():
+                    # Skip empty values
+                    if not value or value.strip() == '':
+                        continue
+                    
+                    # Create MemoryEntry directly without calling retrieve
+                    from memory.backend import MemoryEntry
+                    import time as time_module
+                    
+                    memories.append(MemoryEntry(
+                        user_id=user_id,
+                        key=key,
+                        value=value,
+                        created_at=time_module.time(),  # Approximate timestamp
+                        updated_at=time_module.time(),
+                        metadata={'confidence': 1.0}  # Default confidence
+                    ))
                 
-                # Sort by most recent and limit
-                memories.sort(key=lambda x: x.updated_at, reverse=True)
+                # Sort by key (approximate ordering) and limit
+                memories.sort(key=lambda x: x.key, reverse=True)
                 memories = memories[:limit]
             
             # Format memories for AI consumption
@@ -83,6 +93,10 @@ class MemorySearchTool:
                 confidence = 1.0
                 if memory.metadata:
                     confidence = memory.metadata.get('confidence', 1.0)
+                
+                # Skip empty or null values
+                if not memory.value or memory.value.strip() == '':
+                    continue
                 
                 formatted_memories.append({
                     "type": memory_type[0],
@@ -253,7 +267,10 @@ class MemorySearchTool:
 
     def _get_cache_key(self, user_id: str, query: str) -> str:
         """Generate cache key for memory searches."""
-        return f"{user_id}:{hash(query.lower())}"
+        # Use first 50 chars of query to create more specific cache keys
+        # This prevents collisions between similar but different queries
+        query_preview = query[:50].lower() if query else ""
+        return f"{user_id}:{hash(query_preview)}:{len(query)}"
     
     def _get_from_cache(self, cache_key: str) -> Optional[str]:
         """Get result from cache if valid."""
@@ -374,12 +391,13 @@ class MemorySearchTool:
                 
                 return formatted_memories
             
-            # Store empty result in cache too (to avoid repeated failed searches)
-            self._store_in_cache(cache_key, "")
+            # DON'T cache empty results - they prevent retries when memories exist
+            # Empty results can occur due to transient failures or cache issues
+            # Not caching empty results ensures the next search will try again
             
             # Log performance even for empty results
             search_time = time.time() - start_time
-            self.logger.debug(f"Memory context search completed in {search_time:.3f}s: no memories found")
+            self.logger.warning(f"Memory context search completed in {search_time:.3f}s: no memories found for user {user_id} (query: {message_content[:50]}...)")
             
             return ""
             

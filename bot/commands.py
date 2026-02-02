@@ -822,29 +822,47 @@ def setup_commands(bot):
                 if compat_models:
                     response += "**LOCAL MODELS** (OpenAI-Compatible)\n"
                     response += f"*Endpoint: {openai_compatible_api.api_url.replace('/chat/completions', '')}*\n\n"
-                    for model in compat_models[:15]:  # Limit to 15 models
-                        response += f"`{model}`\n"
-                    if len(compat_models) > 15:
-                        response += f"*...and {len(compat_models) - 15} more*\n"
-                    response += "\n"
+                    
+                    # Recommended local models with tool support info
+                    recommended_local = [
+                        ("qwen3-coder-plus", "Best overall - fast, coherent, tool support ✅"),
+                        ("qwen3-max", "High quality - excellent for complex tasks ✅"),
+                        ("glm-4.6", "Stable - good without tools 🔧"),
+                        ("gemini-2.5-flash", "Fast - reliable responses ✅"),
+                        ("deepseek-v3", "Smart - NO TOOLS (corrupted with function calling) ❌"),
+                    ]
+                    
+                    response += "**⭐ RECOMMENDED:**\n"
+                    for model, desc in recommended_local:
+                        if model in compat_models:
+                            response += f"`{model}` - {desc}\n"
+                    
+                    response += "\n**⚠️ AVOID:**\n"
+                    response += "`qwen3-coder-flash` - Produces garbage output ❌\n"
+                    response += "`glm4.5-air` - Unstable with tools ❌\n"
+                    
+                    response += f"\n**All Available:** {len(compat_models)} models\n"
+                    response += "*Use `%model <name>` to switch*\n\n"
                 else:
                     response += "**LOCAL MODELS** - *Unavailable (connection failed)*\n\n"
 
-            # Show recommended OpenRouter models
-            response += "**OPENROUTER MODELS**\n"
-            response += "*Best for tool calling & conversation*\n\n"
-
-            for model, desc in RECOMMENDED_MODELS:
-                response += f"`{model}` - {desc}\n"
+            # Show recommended OpenRouter models (commented out due to SSL issues)
+            # response += "**OPENROUTER MODELS**\n"
+            # response += "*Best for tool calling & conversation*\n\n"
+            # for model, desc in RECOMMENDED_MODELS:
+            #     response += f"`{model}` - {desc}\n"
 
             response += "\n**Images:** `%image [style] <prompt>` - 49 styles via `%imagemodels`"
             response += "\n**Switch:** `%model <name>` to change"
+            response += "\n\n*Note: OpenRouter models temporarily disabled in listings*"
 
             await send_long_message(ctx.channel, response)
 
         except Exception as e:
+            import traceback
             error_msg = f"💀 Failed to fetch models: {str(e)}"
             logger.error(error_msg)
+            logger.error(f"Full traceback: {traceback.format_exc()}")
             await ctx.send(error_msg)
 
         # Remove thinking reaction

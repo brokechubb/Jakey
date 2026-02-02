@@ -394,3 +394,112 @@ The message relay feature now uses webhooks exclusively instead of direct channe
 - Bot-only intents and privileges
   **REMEMBER**: Self-bots have different capabilities than official bots
 ```
+
+## AI Model Recommendations
+
+### Local Models (OpenAI-Compatible @ localhost:8317)
+
+The bot uses a local AI endpoint with automatic model capability detection and tool support filtering.
+
+#### ✅ Recommended Models (Full Tool Support)
+
+**These models support all 42 function/tool calls without issues:**
+
+1. **`qwen3-coder-plus`** ⭐ BEST OVERALL
+   - Default model (configured in `.env`)
+   - Fast responses (2-4s), coherent output
+   - Full tool support for web search, crypto prices, Discord management
+   - Use for: General conversation, tool usage, coding assistance
+
+2. **`qwen3-max`**
+   - High quality for complex reasoning tasks
+   - Slower but more accurate than qwen3-coder-plus
+   - Full tool support
+   - Use for: Complex analysis, detailed responses
+
+3. **`gemini-2.5-flash`**
+   - Very fast responses
+   - Reliable and stable
+   - Full tool support
+   - Use for: Quick answers, simple tasks
+
+#### 🔧 Conversation-Only Models (No Tool Support)
+
+**These models work well but CANNOT use function calling (tools disabled automatically):**
+
+4. **`glm-4.6`** - Stable conversation without tools
+5. **`deepseek-v3`** / **`deepseep-v3.1`** / **`deepseek-v3.2`** - Intelligent but corrupted with tools
+
+#### ❌ Broken Models (Avoid)
+
+**DO NOT USE - produce garbled output:**
+
+- **`qwen3-coder-flash`** - Generates random words, mixed languages, code artifacts
+- **`glm4.5-air`** - Unstable, random corruption
+
+### How Tool Filtering Works
+
+The bot automatically detects model capabilities in `bot/client.py`:
+
+```python
+# Check if current model supports tools
+model_supports_tools = self._model_supports_tools(self.current_model)
+if not model_supports_tools:
+    logger.info(f"Model '{self.current_model}' does not support tools, disabling function calling")
+    available_tools = None  # Disable all 42 tools
+```
+
+**Blacklist** (no tools): `qwen3-coder-flash`, `deepseek-v3`, `glm4.5-air`  
+**Whitelist** (full tools): `qwen3-coder-plus`, `qwen3-max`, `gemini-2.5-flash`
+
+### Model Commands
+
+- **View available models**: `%models` - Shows recommended models with tool support indicators
+- **Switch model**: `%model qwen3-coder-plus` - Change current model
+- **Check current model**: `%model` (no arguments)
+
+### Troubleshooting Model Issues
+
+**Getting garbled output like "💢 What tf did u need? Just taunted DAWN_myinkaliciös brigands..."?**
+
+This happens when:
+1. Model is corrupted with tool definitions (42 function schemas overwhelm the context)
+2. Using a blacklisted model that doesn't support function calling properly
+
+**Solution:**
+```bash
+%model qwen3-coder-plus  # Switch to stable model
+```
+
+**Check logs for automatic filtering:**
+```bash
+tail -f /home/chubb/bots/JakeySelfBot/logs/jakey_selfbot.log | grep -E "blacklist|does not support tools"
+```
+
+Expected output:
+```
+INFO bot.client Model 'deepseek-v3' is blacklisted from using tools
+INFO bot.client Model 'deepseek-v3' does not support tools, disabling function calling
+```
+
+### Model Configuration
+
+**Default model** (in `.env`):
+```env
+OPENAI_COMPAT_DEFAULT_MODEL=qwen3-coder-plus
+```
+
+**Local endpoint** (in `.env`):
+```env
+OPENAI_COMPAT_API_URL=http://localhost:8317/v1/chat/completions
+OPENAI_COMPAT_MODELS_URL=http://localhost:8317/v1/models
+```
+
+**OpenRouter fallback** (when local endpoint unavailable):
+```env
+OPENROUTER_ENABLED=true
+OPENROUTER_DEFAULT_MODEL=meta-llama/llama-3.3-70b-instruct:free
+```
+
+For detailed model information, see: `docs/MODEL_RECOMMENDATIONS.md`
+

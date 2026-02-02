@@ -163,7 +163,7 @@ class OpenAICompatibleAPI:
         self,
         messages: List[Dict[str, str]],
         model: Optional[str] = None,
-        temperature: float = 1.0,
+        temperature: float = 0.7,
         max_tokens: int = 500,
         tools: Optional[List[Dict[str, Any]]] = None,
         tool_choice: Optional[str] = None,
@@ -184,7 +184,7 @@ class OpenAICompatibleAPI:
         Args:
             messages: List of message dicts with 'role' and 'content'
             model: Model ID to use
-            temperature: Creativity (0-2, default 1.0)
+            temperature: Creativity (0-2, default 0.7)
             max_tokens: Max response length
             tools: Function calling tools
             tool_choice: Tool selection mode ('auto', 'none', or specific)

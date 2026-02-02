@@ -1285,7 +1285,7 @@ class ToolManager:
                 return f"Both MCP and local storage failed: MCP: {str(e)}, Local: {str(fallback_error)}"
 
     def search_user_memory(self, user_id: str, query: str = "") -> str:
-        """Search user memories with rate limiting"""
+        """Search user memories with rate limiting - Uses SQLite as single source"""
         if not self._check_rate_limit("search_user_memory", user_id):
             return "Rate limit exceeded. Please wait before searching memories."
 
@@ -1293,107 +1293,64 @@ class ToolManager:
         import asyncio
         import concurrent.futures
 
-        # Check if unified memory backend is enabled (migration complete)
-        migration_flag = os.path.join(
-            os.path.dirname(os.path.dirname(__file__)), ".memory_migration_complete"
-        )
-        if os.path.exists(migration_flag):
-            try:
-                # Dynamic import to avoid circular dependencies
-                import importlib
-
-                memory_module = importlib.import_module("memory")
-                memory_backend = memory_module.memory_backend
-
-                if memory_backend is not None:
-                    # Use unified memory backend
-                    async def _search_memory():
-                        results = await memory_backend.search(
-                            user_id, query or None, limit=5
-                        )
-                        return results
-
-                    # Run the async operation
-                    try:
-                        loop = asyncio.get_running_loop()
-                        with concurrent.futures.ThreadPoolExecutor() as executor:
-                            future = executor.submit(asyncio.run, _search_memory())
-                            results = future.result()
-                    except RuntimeError:
-                        results = asyncio.run(_search_memory())
-
-                    if not results:
-                        return f"No memories found for user {user_id}."
-
-                    # Format the results
-                    formatted_memories = []
-                    for entry in results:
-                        key = entry.key
-                        value = entry.value
-                        formatted_memories.append(f"• {key}: {value}")
-
-                    return (
-                        f"Found memories for user {user_id} (unified):\n"
-                        + "\n".join(formatted_memories)
-                    )
-            except (ImportError, AttributeError) as e:
-                # Log but don't fail - fall back to legacy system
-                import logging
-
-                logging.getLogger(__name__).warning(
-                    f"Unified memory backend unavailable for search: {e}"
-                )
-
-        # Fallback to legacy MCP system
-        if not MCP_MEMORY_ENABLED:
-            return (
-                "Memory search not available. Use remember_user_info for local storage."
-            )
-
         try:
-            # Import MCP memory client
-            from tools.mcp_memory_client import MCPMemoryClient
+            # Dynamic import to avoid circular dependencies
+            import importlib
 
-            # Create the async function to run the search
-            async def _run_search_with_context():
-                async with MCPMemoryClient() as client:
-                    if not await client.check_connection():
-                        return {"error": "MCP memory server not accessible"}
-                    return await client.search_user_memory(
-                        user_id, query if query else None
-                    )
+            memory_module = importlib.import_module("memory")
+            memory_backend = memory_module.memory_backend
 
-            # Check if there's already a running event loop
+            if memory_backend is None:
+                return "Memory backend not available."
+
+            # Use unified memory backend (SQLite)
+            async def _search_memory():
+                results = await memory_backend.search(
+                    user_id, query or None, limit=10
+                )
+                return results
+
+            # Run the async operation
             try:
                 loop = asyncio.get_running_loop()
-                # If there's a running loop, create a task and wait for it
                 with concurrent.futures.ThreadPoolExecutor() as executor:
-                    future = executor.submit(asyncio.run, _run_search_with_context())
-                    result = future.result()
+                    future = executor.submit(asyncio.run, _search_memory())
+                    results = future.result()
             except RuntimeError:
-                # No running event loop, safe to run directly
-                result = asyncio.run(_run_search_with_context())
+                results = asyncio.run(_search_memory())
 
-            if "error" in result:
-                return f"MCP memory search failed: {result['error']}. Local search not available for this tool."
+            if not results:
+                return f"No memories found for user {user_id}."
 
             # Format the results
-            memories = result.get("memories", [])
-            if not memories:
-                return f"No memories found for user {user_id} in MCP memory server."
-
             formatted_memories = []
-            for memory in memories[:5]:  # Limit to top 5 results
-                info_type = memory.get("information_type", "unknown")
-                info = memory.get("information", "")
-                timestamp = memory.get("timestamp", "")
-                formatted_memories.append(f"• {info_type}: {info}")
+            for entry in results[:10]:  # Show up to 10 results
+                # Extract memory type from key
+                key_parts = entry.key.split('_', 2)
+                if len(key_parts) >= 2:
+                    mem_type = key_parts[0]
+                    category = key_parts[1] if len(key_parts) > 1 else ""
+                    label = f"{mem_type}/{category}" if category else mem_type
+                else:
+                    label = entry.key
+                
+                # Truncate long values
+                value = entry.value
+                if len(value) > 100:
+                    value = value[:97] + "..."
+                
+                formatted_memories.append(f"• [{label}] {value}")
 
-            return f"Found memories for user {user_id} (MCP):\n" + "\n".join(
-                formatted_memories
+            return (
+                f"Found {len(results)} memories for user {user_id}:\n"
+                + "\n".join(formatted_memories)
             )
+        except (ImportError, AttributeError) as e:
+            logger.error(f"Memory backend error: {e}")
+            return f"Memory search error: {str(e)}"
         except Exception as e:
-            return f"Error searching MCP memory: {str(e)}. Local search not available for this tool."
+            logger.error(f"Unexpected memory search error: {e}")
+            return f"Error searching memories: {str(e)}"
 
     def get_crypto_price(
         self, symbol: str, currency: str = "USD", user_id: str = "system"

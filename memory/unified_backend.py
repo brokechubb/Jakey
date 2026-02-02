@@ -25,24 +25,13 @@ class UnifiedMemoryBackend:
     def _initialize_backends(self):
         """Initialize all available memory backends"""
         from data.database import db
-        from tools.mcp_memory_client import MCPMemoryClient
-        from config import MCP_MEMORY_ENABLED
 
-        # Always add SQLite backend (primary/fallback)
+        # Use SQLite as the single source of truth
+        # This simplifies the architecture and eliminates sync issues
         sqlite_config = MemoryConfig(enabled=True, priority=1)
         self.backends["sqlite"] = self._create_sqlite_backend(sqlite_config, db)
 
-        # Add MCP backend if enabled (higher priority)
-        if MCP_MEMORY_ENABLED:
-            try:
-                mcp_client = MCPMemoryClient()
-                mcp_config = MemoryConfig(enabled=True, priority=2)  # Higher priority
-                self.backends["mcp"] = self._create_mcp_backend(mcp_config, mcp_client)
-                logger.info("MCP memory backend initialized")
-            except Exception as e:
-                logger.warning(f"Failed to initialize MCP memory backend: {e}")
-
-        logger.info(f"Initialized {len(self.backends)} memory backends")
+        logger.info(f"Initialized {len(self.backends)} memory backend(s) - Using SQLite as single source")
 
     def _create_sqlite_backend(self, config: MemoryConfig, db_manager) -> MemoryBackend:
         """Create SQLite backend instance"""

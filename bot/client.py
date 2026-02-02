@@ -695,6 +695,20 @@ class JakeyBot(commands.Bot):
 
         # Check if model supports tools from cache
         model_key = model_name.strip().lower()
+        
+        # Blacklist: Models known to have issues with function calling
+        # These models produce garbled output when sent tool definitions
+        tool_broken_models = [
+            "qwen3-coder-flash",  # Produces garbage with tools
+            "deepseek-v3",  # Has issues with 42+ tools
+            "deepseek-v3.1",  # Has issues with 42+ tools
+            "deepseek-v3.2",  # Has issues with 42+ tools
+            "glm4.5-air",  # Better without tools
+        ]
+        if model_key in tool_broken_models:
+            logger.info(f"Model '{model_key}' is blacklisted from using tools")
+            return False
+        
         # Special case: Known models that support tools regardless of API data
         # Updated with actual Pollinations models (Jan 2026)
         trusted_tool_models = [
@@ -704,11 +718,12 @@ class JakeyBot(commands.Bot):
             "gemini",
             "gemini-search",
             "mistral",
-            "deepseek",
             "qwen-coder",
             "roblox-rp",
             "unity",
             "bidara",
+            "qwen3-coder-plus",  # Works well with tools
+            "qwen3-max",  # Works well with tools
         ]
         if model_key in trusted_tool_models:
             logger.debug(f"Model '{model_key}' is in trusted tool models list")
@@ -809,7 +824,7 @@ class JakeyBot(commands.Bot):
                 result = await ai_provider_manager.generate_text(
                     messages=rephrase_messages,
                     max_tokens=min(len(original_response.split()) * 3, 800),
-                    temperature=0.9
+                    temperature=0.6
                     + (attempt * 0.1),  # Increase temperature each attempt
                 )
 
@@ -944,7 +959,7 @@ class JakeyBot(commands.Bot):
                         {"role": "user", "content": user_message},
                     ],
                     max_tokens=400,
-                    temperature=1.2
+                    temperature=0.8
                     + (attempt * 0.1),  # Increase temperature each attempt
                 )
 
@@ -1649,15 +1664,21 @@ class JakeyBot(commands.Bot):
             from tools.tool_manager import tool_manager
 
             available_tools = tool_manager.get_available_tools()
+            
+            # Check if current model supports tools - disable tools for problematic models
+            model_supports_tools = self._model_supports_tools(self.current_model)
+            if not model_supports_tools:
+                logger.info(f"Model '{self.current_model}' does not support tools, disabling function calling")
+                available_tools = None
 
             logger.debug(f"Generating AI response with model: {self.current_model}")
             response = await self._ai_manager.generate_text(
                 messages=valid_messages,
                 model=self.current_model,
-                temperature=1.0,
+                temperature=0.7,
                 max_tokens=250,  # Reduced from 500 to force brevity (approx 200 words max)
                 tools=available_tools,
-                tool_choice="auto",
+                tool_choice="auto" if available_tools else "none",
                 # Anti-repetition parameters from OpenRouter API
                 repetition_penalty=1.15,  # Slightly penalize repeated tokens
                 frequency_penalty=0.3,  # Reduce repetition of frequent tokens
@@ -1974,7 +1995,7 @@ class JakeyBot(commands.Bot):
                             final_response = await self._ai_manager.generate_text(
                                 messages=valid_messages,
                                 model=self.current_model,
-                                temperature=1.0,
+                                temperature=0.7,
                                 max_tokens=2000,
                                 tools=available_tools if not is_final_round else None,
                                 tool_choice=current_tool_choice,
@@ -3610,7 +3631,7 @@ class JakeyBot(commands.Bot):
                 messages=messages,
                 model=WELCOME_MESSAGE_MODEL,
                 max_tokens=300,
-                temperature=1.0,
+                temperature=0.7,
             )
 
             logger.debug(f"🤖 AI response received: {response}")
