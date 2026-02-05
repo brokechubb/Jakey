@@ -20,7 +20,9 @@ This project is my passion project - a journey through full-stack development th
 
 ### 🤖 **AI That Actually Works**
 
-- **Free AI Models**: Pollinations primary, OpenRouter backup - never gets stuck
+- **Primary AI**: qwen3-max via [iflow.cn](https://platform.iflow.cn) (free, through [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI)) with full tool support
+- **Fallback AI**: deepseek-v3 (uncensored, no safety filters) when content filtering triggers
+- **Smart Failover**: Automatically switches to deepseek-v3 on content filter errors, then back to qwen3-max
 - **Art Gallery in Your Discord**: 49 artistic styles from Van Gogh to anime waifus
 - **Tool Belt**: 12 specialized tools for crypto prices, web search, math, and more
 - **Anti-Repetition Tech**: Advanced system so Jakey doesn't repeat himself like a broken record
@@ -255,6 +257,31 @@ Jakey features 35 comprehensive commands across 8 categories, all with built-in 
 
 See [`config.py`](config.py) and [Configuration Guide](docs/CONFIGURATION.md) for complete documentation.
 
+### 🧠 AI Provider Setup
+
+Jakey uses a sophisticated dual-model approach for maximum reliability:
+
+**Primary Model: qwen3-max**
+- Provider: [iflow.cn](https://platform.iflow.cn) (Xinliu Open Platform) - completely free
+- Access: Via [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) wrapping the iFlow CLI
+- Features: Full tool support (42 tools), Qwen3Guard safety filtering, excellent reasoning
+- Endpoint: `http://localhost:8317/v1/chat/completions` (local CLIProxyAPI instance)
+
+**Fallback Model: deepseek-v3**
+- Provider: [iflow.cn](https://platform.iflow.cn) - also free
+- Purpose: Automatic fallback when qwen3-max content filtering triggers
+- Features: No safety filters, uncensored responses, conversation-only (no tool support)
+- Trigger: HTTP 400 DataInspectionFailed errors automatically switch to this model
+
+**Why This Setup?**
+- Both models are **100% free** through iflow.cn's generous API
+- qwen3-max has strict content filtering (Qwen3Guard) but excellent tool calling
+- deepseek-v3 has zero filtering but can't use tools effectively
+- Automatic failover ensures Jakey always responds, even to edgy content
+
+**Available Models on iflow.cn (via CLIProxyAPI):**
+All 42+ models including qwen3-max, deepseek-v3/v3.1/v3.2, gemini-2.5-flash, kimi-k2, glm-4.6, and more. See the full list with `curl http://localhost:8317/v1/models` when CLIProxyAPI is running.
+
 ## 🔐 Security & Admin Features
 
 - **Admin Controls**: Restricted commands with user ID validation
@@ -374,7 +401,8 @@ python -m unittest tests.test_commands.TestCommands.test_help  # Specific test
 
 ### External APIs
 
-- **AI**: Pollinations (primary), OpenRouter (fallback), Arta (artistic images)
+- **AI**: [iflow.cn](https://platform.iflow.cn) via [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) - qwen3-max (primary), deepseek-v3 (fallback)
+- **Image Generation**: Arta (49 artistic styles), Pollinations
 - **Financial**: CoinMarketCap (crypto prices), tip.cc (tipping)
 - **Search**: Self-hosted SearXNG instance
 - **Memory**: MCP protocol implementation
