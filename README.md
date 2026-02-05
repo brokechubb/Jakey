@@ -20,9 +20,9 @@ This project is my passion project - a journey through full-stack development th
 
 ### 🤖 **AI That Actually Works**
 
-- **Primary AI**: qwen3-max via [iflow.cn](https://platform.iflow.cn) (free, through [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI)) with full tool support
-- **Fallback AI**: deepseek-v3 (uncensored, no safety filters) when content filtering triggers
-- **Smart Failover**: Automatically switches to deepseek-v3 on content filter errors, then back to qwen3-max
+- **Free AI Models**: qwen3-max, deepseek-v3, and 40+ others from [iflow.cn](https://platform.iflow.cn) - all completely free
+- **OpenAI-Compatible API**: Accessed via [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) which wraps iflow.cn's CLI tools into standard OpenAI API endpoints
+- **Smart Failover**: Automatically switches from qwen3-max (with safety filters) to deepseek-v3 (uncensored) when content filtering triggers
 - **Art Gallery in Your Discord**: 49 artistic styles from Van Gogh to anime waifus
 - **Tool Belt**: 12 specialized tools for crypto prices, web search, math, and more
 - **Anti-Repetition Tech**: Advanced system so Jakey doesn't repeat himself like a broken record
@@ -261,26 +261,32 @@ See [`config.py`](config.py) and [Configuration Guide](docs/CONFIGURATION.md) fo
 
 Jakey uses a sophisticated dual-model approach for maximum reliability:
 
+**The Setup**
+- **Model Source**: [iflow.cn](https://platform.iflow.cn) (Xinliu Open Platform) - provides 42+ AI models completely free
+- **API Access**: [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) - converts iflow.cn's CLI tools into OpenAI-compatible REST API endpoints
+- **Local Endpoint**: `http://localhost:8317/v1/chat/completions`
+
 **Primary Model: qwen3-max**
-- Provider: [iflow.cn](https://platform.iflow.cn) (Xinliu Open Platform) - completely free
-- Access: Via [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) wrapping the iFlow CLI
+- Source: Free from iflow.cn
+- Access: Via CLIProxyAPI OpenAI-compatible endpoint
 - Features: Full tool support (42 tools), Qwen3Guard safety filtering, excellent reasoning
-- Endpoint: `http://localhost:8317/v1/chat/completions` (local CLIProxyAPI instance)
+- Note: Has content filtering that can trigger on edgy content
 
 **Fallback Model: deepseek-v3**
-- Provider: [iflow.cn](https://platform.iflow.cn) - also free
+- Source: Also free from iflow.cn
 - Purpose: Automatic fallback when qwen3-max content filtering triggers
-- Features: No safety filters, uncensored responses, conversation-only (no tool support)
+- Features: No safety filters, completely uncensored, conversation-only (no tool support)
 - Trigger: HTTP 400 DataInspectionFailed errors automatically switch to this model
 
 **Why This Setup?**
-- Both models are **100% free** through iflow.cn's generous API
-- qwen3-max has strict content filtering (Qwen3Guard) but excellent tool calling
-- deepseek-v3 has zero filtering but can't use tools effectively
-- Automatic failover ensures Jakey always responds, even to edgy content
+- All models are **100% free** through iflow.cn's generous API
+- CLIProxyAPI provides a standard OpenAI-compatible interface (no custom code needed)
+- qwen3-max has safety filters but excellent tool calling
+- deepseek-v3 has zero filtering but limited tool support
+- Automatic failover ensures Jakey always responds
 
-**Available Models on iflow.cn (via CLIProxyAPI):**
-All 42+ models including qwen3-max, deepseek-v3/v3.1/v3.2, gemini-2.5-flash, kimi-k2, glm-4.6, and more. See the full list with `curl http://localhost:8317/v1/models` when CLIProxyAPI is running.
+**Available Models (all free via iflow.cn through CLIProxyAPI):**
+42+ models including qwen3-max, deepseek-v3/v3.1/v3.2, gemini-2.5-flash, kimi-k2, glm-4.6, and more. See the full list with `curl http://localhost:8317/v1/models` when CLIProxyAPI is running.
 
 ## 🔐 Security & Admin Features
 
@@ -401,7 +407,7 @@ python -m unittest tests.test_commands.TestCommands.test_help  # Specific test
 
 ### External APIs
 
-- **AI**: [iflow.cn](https://platform.iflow.cn) via [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) - qwen3-max (primary), deepseek-v3 (fallback)
+- **AI**: [iflow.cn](https://platform.iflow.cn) free models (qwen3-max, deepseek-v3, etc.) via [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) OpenAI-compatible endpoints
 - **Image Generation**: Arta (49 artistic styles), Pollinations
 - **Financial**: CoinMarketCap (crypto prices), tip.cc (tipping)
 - **Search**: Self-hosted SearXNG instance
