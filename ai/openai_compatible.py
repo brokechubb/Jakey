@@ -321,6 +321,13 @@ class OpenAICompatibleAPI:
                     logger.error(f"OpenAI-Compatible: {error_msg} - Max retries reached")
                     return {"error": error_msg}
 
+                elif response.status_code == 400:
+                    # Bad request - content validation error, don't retry
+                    error_text = response.text[:500]
+                    error_msg = f"HTTP 400 (Bad Request): {error_text}"
+                    logger.error(f"OpenAI-Compatible: {error_msg}")
+                    # Mark as unrecoverable so provider manager won't fallback
+                    return {"error": error_msg, "unrecoverable": True}
                 else:
                     error_msg = f"HTTP {response.status_code}: {response.text[:200]}"
                     logger.error(f"OpenAI-Compatible: {error_msg}")

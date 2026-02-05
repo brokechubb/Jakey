@@ -12,6 +12,7 @@ from ai.openrouter import openrouter_api
 from config import (
     DISABLE_REASONING_MODELS,
     FALLBACK_MODELS,
+    MAX_CONVERSATION_TOKENS,
     OPENAI_COMPAT_DEFAULT_MODEL,
     OPENAI_COMPAT_ENABLED,
     OPENROUTER_DEFAULT_MODEL,
@@ -20,6 +21,123 @@ from config import (
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
+
+
+def estimate_tokens(text: str) -> int:
+    """Rough token estimation (1 token ≈ 4 characters for English)."""
+    if not text:
+        return 0
+    return len(text) // 4
+
+
+def sanitize_messages_for_api(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Sanitize messages to ensure API compliance.
+    
+    Fixes:
+    1. Remove empty string content (omit field entirely instead of null)
+    2. Ensure required fields are present
+    3. Remove any None values that might cause issues
+    """
+    sanitized = []
+    for msg in messages:
+        if not isinstance(msg, dict):
+            continue
+            
+        role = msg.get("role")
+        if not role:
+            continue
+            
+        # Create sanitized message with required fields
+        clean_msg = {"role": role}
+        
+        # Handle content field - omit empty strings entirely (don't send null)
+        content = msg.get("content")
+        if content:  # Only include content if it's a non-empty string
+            clean_msg["content"] = content
+            
+        # Handle tool_calls if present
+        if "tool_calls" in msg and msg["tool_calls"]:
+            clean_msg["tool_calls"] = msg["tool_calls"]
+            
+        # Handle tool_call_id for tool messages
+        if "tool_call_id" in msg:
+            clean_msg["tool_call_id"] = msg["tool_call_id"]
+            
+        sanitized.append(clean_msg)
+        
+    return sanitized
+
+
+def trim_messages_to_fit(messages: List[Dict[str, Any]], max_tokens: int) -> List[Dict[str, Any]]:
+    """
+    Trim messages to fit within token limit while preserving system prompt and most recent context.
+    
+    CRITICAL: Never remove messages with tool_calls or tool responses as this breaks the conversation flow.
+    
+    Strategy:
+    1. Keep system messages (usually the first message)
+    2. Keep ALL messages with tool_calls or tool_call_id (essential for tool conversation flow)
+    3. Keep the most recent user/assistant messages
+    4. Remove older non-essential messages if needed
+    """
+    if not messages:
+        return messages
+    
+    # Calculate total tokens (only count content, tool_calls are handled separately)
+    total_tokens = sum(estimate_tokens(msg.get("content", "")) for msg in messages)
+    
+    if total_tokens <= max_tokens:
+        return messages
+    
+    # Need to trim - but preserve essential messages
+    trimmed = []
+    optional_messages = []
+    
+    # First pass: identify essential vs optional messages
+    for i, msg in enumerate(messages):
+        role = msg.get("role")
+        has_tool_calls = "tool_calls" in msg and msg["tool_calls"]
+        has_tool_call_id = "tool_call_id" in msg
+        
+        # System message is always essential
+        if role == "system":
+            trimmed.append(msg)
+        # Messages with tool_calls or tool_call_id are ESSENTIAL - never remove these
+        elif has_tool_calls or has_tool_call_id:
+            trimmed.append(msg)
+        else:
+            # These are optional and can be removed if needed
+            optional_messages.append((i, msg))
+    
+    # Calculate current tokens from essential messages
+    current_tokens = sum(estimate_tokens(msg.get("content", "")) for msg in trimmed)
+    
+    # Add optional messages from most recent backwards until we hit the limit
+    kept_optional = []
+    for idx, msg in reversed(optional_messages):
+        msg_tokens = estimate_tokens(msg.get("content", ""))
+        if current_tokens + msg_tokens <= max_tokens:
+            kept_optional.insert(0, (idx, msg))
+            current_tokens += msg_tokens
+        else:
+            break
+    
+    # Combine essential and kept optional messages, preserving original order
+    all_kept_indices = set()
+    for msg in trimmed:
+        all_kept_indices.add(messages.index(msg))
+    for idx, _ in kept_optional:
+        all_kept_indices.add(idx)
+    
+    result = [messages[i] for i in sorted(all_kept_indices)]
+    
+    if len(result) < len(messages):
+        logger.info(f"Trimmed messages from {len(messages)} to {len(result)} messages "
+                    f"(estimated tokens: {total_tokens} -> {current_tokens}, "
+                    f"preserved {len(trimmed) - (1 if messages and messages[0].get('role') == 'system' else 0)} tool-related messages)")
+    
+    return result
 
 
 @dataclass
@@ -160,6 +278,9 @@ class SimpleAIProviderManager:
         start_time = time.time()
         self.stats["total_requests"] += 1
 
+        # Sanitize messages for API compliance (convert empty strings to None, etc.)
+        messages = sanitize_messages_for_api(messages)
+        
         # DIAGNOSTIC LOGGING: Log tool calling configuration
         if tools:
             logger.info(
@@ -241,6 +362,79 @@ class SimpleAIProviderManager:
 
                 if isinstance(result, dict) and "error" in result:
                     last_error = result["error"]
+                    is_marked_unrecoverable = result.get("unrecoverable", False)
+                    error_str = str(last_error).lower()
+                    
+                    # Check if this is a content filter / safety issue
+                    is_content_filter = (
+                        "data inspection failed" in error_str or
+                        "datainspectionfailed" in error_str or
+                        "content filter" in error_str or
+                        "inappropriate content" in error_str or
+                        "safety" in error_str
+                    )
+                    
+                    # For content filter errors, retry with deepseek-v3 (no safety filter)
+                    if is_content_filter and provider_name == "openai_compatible":
+                        logger.warning(f"{provider_name} content filter triggered. "
+                                       f"Retrying with deepseek-v3 (no safety filter)...")
+                        try:
+                            retry_result = await asyncio.to_thread(
+                                self.openai_compat_api.generate_text,
+                                messages=messages,
+                                model="deepseek-v3",  # Use uncensored model
+                                temperature=temperature,
+                                max_tokens=max_tokens,
+                                tools=None,  # deepseek doesn't support tools well anyway
+                                tool_choice="none",
+                                **api_kwargs,
+                            )
+                            if "error" not in retry_result:
+                                logger.info(f"Retry with deepseek-v3 succeeded")
+                                self.stats["successful_requests"] += 1
+                                self.stats["provider_usage"][provider_name] += 1
+                                # Note: Tools won't work but at least we get a response
+                                return retry_result
+                        except Exception as retry_e:
+                            logger.warning(f"Retry with deepseek-v3 failed: {retry_e}")
+                            
+                        # If deepseek also fails, try without tools as last resort
+                        if tools:
+                            logger.warning(f"Trying original model without tools...")
+                            try:
+                                retry_result = await asyncio.to_thread(
+                                    self.openai_compat_api.generate_text,
+                                    messages=messages,
+                                    model=compat_model,
+                                    temperature=temperature,
+                                    max_tokens=max_tokens,
+                                    tools=None,
+                                    tool_choice="none",
+                                    **api_kwargs,
+                                )
+                                if "error" not in retry_result:
+                                    logger.info(f"Retry without tools succeeded")
+                                    self.stats["successful_requests"] += 1
+                                    self.stats["provider_usage"][provider_name] += 1
+                                    return retry_result
+                            except Exception as retry_e:
+                                logger.warning(f"Retry without tools failed: {retry_e}")
+                    
+                    # Don't fallback on other unrecoverable errors (HTTP 400, content issues)
+                    # These are validation/content errors that won't be fixed by switching providers
+                    is_unrecoverable = is_marked_unrecoverable or (
+                        "invalid request" in error_str or
+                        "bad request" in error_str or
+                        "context length" in error_str or
+                        "maximum context" in error_str or
+                        "too large" in error_str
+                    )
+                    
+                    if is_unrecoverable:
+                        logger.error(f"{provider_name} returned unrecoverable error: {last_error}. "
+                                     f"Not attempting fallback - this is a content/validation issue.")
+                        return {"error": last_error}
+                    
                     logger.warning(f"{provider_name} error: {last_error}, trying fallback...")
                     if provider_name == "openai_compatible" and self.fallback_enabled:
                         self.stats["failover_count"] += 1

@@ -1640,11 +1640,16 @@ class JakeyBot(commands.Bot):
                 "If you write a paragraph, you have FAILED."
             )
 
+            # Build user message with prominent identity info at the START
+            # This ensures the model knows who it's talking to
+            user_identity_prefix = f"[{message.author.name} says]: "
+            enhanced_user_content = user_identity_prefix + user_content
+            
             messages = [
                 {"role": "system", "content": system_content},
             ]
 
-            messages.append({"role": "user", "content": user_content})
+            messages.append({"role": "user", "content": enhanced_user_content})
 
             # Removed redundant database conversation history retrieval
             # Channel context already provides conversation history via collect_recent_channel_context
@@ -1879,7 +1884,7 @@ class JakeyBot(commands.Bot):
                                 "get_crypto_price": ["symbol"],
                                 "generate_image": ["prompt"],
                                 "analyze_image": ["image_url"],
-                                "remember_user_info": ["user_id", "info"],
+                                "remember_user_info": ["user_id", "information_type", "information"],
                                 "search_user_memory": ["user_id", "query"],
                                 "tip_user": ["recipient_id", "amount", "token"],
                                 "discord_send_message": ["channel_id", "content"],
@@ -1919,20 +1924,30 @@ class JakeyBot(commands.Bot):
                                     f"📸 Tracked generated image URL for response"
                                 )
 
-                            # Add tool response
+                            # Add tool response with size limiting to prevent context overflow
+                            result_str = str(result)
+                            max_tool_result_length = 1500  # Limit tool results to prevent context overflow
+                            if len(result_str) > max_tool_result_length:
+                                result_str = result_str[:max_tool_result_length] + "\n\n[Result truncated due to length - too much data for AI context]"
+                                logger.info(f"Tool result truncated from {len(str(result))} to {max_tool_result_length} chars")
+                            
                             tool_messages.append(
                                 {
                                     "role": "tool",
-                                    "content": str(result),
+                                    "content": result_str,
                                     "tool_call_id": tool_call_id,
                                 }
                             )
                         except Exception as e:
-                            logger.error(f"Error executing tool {function_name}: {e}")
+                            error_msg = f"Error executing tool {function_name}: {str(e)}"
+                            logger.error(error_msg)
+                            # Limit error message length too
+                            if len(error_msg) > 500:
+                                error_msg = error_msg[:500] + "..."
                             tool_messages.append(
                                 {
                                     "role": "tool",
-                                    "content": f"Error executing tool {function_name}: {str(e)}",
+                                    "content": error_msg,
                                     "tool_call_id": tool_call_id,
                                 }
                             )
@@ -1962,13 +1977,15 @@ class JakeyBot(commands.Bot):
                             sanitized_tool_calls.append(sanitized_tc)
 
                         # Add the assistant message that requested the tools
-                        valid_messages.append(
-                            {
-                                "role": "assistant",
-                                "content": assistant_content,
-                                "tool_calls": sanitized_tool_calls,
-                            }
-                        )
+                        # Build message dict, only including content if it has value
+                        assistant_msg = {
+                            "role": "assistant",
+                            "tool_calls": sanitized_tool_calls,
+                        }
+                        if assistant_content:
+                            assistant_msg["content"] = assistant_content
+
+                        valid_messages.append(assistant_msg)
                         # Add the tool results
                         valid_messages.extend(tool_messages)
 
