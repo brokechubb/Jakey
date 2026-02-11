@@ -38,6 +38,27 @@ class FatTipsManager:
         self._jakey_balance_cache_time = 0
         self._balance_cache_ttl = 30  # Cache balance for 30 seconds
         
+        # Transaction logging
+        self._setup_transaction_logging()
+
+    def _setup_transaction_logging(self):
+        """Set up dedicated logger for FatTips transactions"""
+        self.tx_logger = logging.getLogger("fattips_transactions")
+        self.tx_logger.setLevel(logging.INFO)
+        
+        # Prevent duplicate handlers
+        if not self.tx_logger.handlers:
+            log_dir = "logs"
+            if not os.path.exists(log_dir):
+                os.makedirs(log_dir)
+            
+            tx_log_path = os.path.join(log_dir, "fattips_transactions.log")
+            handler = logging.FileHandler(tx_log_path, encoding='utf-8')
+            formatter = logging.Formatter('%(asctime)s | %(message)s', '%Y-%m-%d %H:%M:%S')
+            handler.setFormatter(formatter)
+            self.tx_logger.addHandler(handler)
+            self.tx_log_path = tx_log_path
+        
         # Rate limiting
         self.last_call_time = {}
         self.rate_limits = {
@@ -183,6 +204,54 @@ class FatTipsManager:
         return None  # No error, allowed
 
     # Tip Operations
+    def _log_transaction(self, tx_type: str, details: Dict[str, Any]):
+        """Log a transaction to the transactions log file"""
+        try:
+            currency = details.get('token', details.get('tokenMint', 'UNKNOWN'))
+            currency_name = self.CURRENCY_NAMES.get(currency.upper(), currency)
+            
+            if tx_type == 'TIP':
+                self.tx_logger.info(
+                    f"TIP | From: {details.get('from', '?')} → To: {details.get('to', '?')} | "
+                    f"{details.get('amountToken', details.get('amount', 0)):.4f} {currency_name} ({currency}) | "
+                    f"~${details.get('amountUsd', 0):.2f} USD | Sig: {details.get('signature', '?')[:16]}..."
+                )
+            elif tx_type == 'BATCH_TIP':
+                self.tx_logger.info(
+                    f"BATCH_TIP | From: {details.get('from', '?')} | Recipients: {len(details.get('recipients', []))} | "
+                    f"Total: {details.get('totalAmountToken', 0):.4f} {currency_name} ({currency}) | "
+                    f"~${details.get('totalAmountUsd', 0):.2f} USD | Sig: {details.get('signature', '?')[:16]}..."
+                )
+            elif tx_type == 'AIRDROP':
+                self.tx_logger.info(
+                    f"AIRDROP | Creator: {details.get('creatorDiscordId', details.get('creatorId', '?'))} | "
+                    f"Pot: {details.get('potSize', 0):.4f} {currency_name} ({currency}) | "
+                    f"~${details.get('totalUsd', 0):.2f} USD | Max Winners: {details.get('maxWinners', details.get('max_winners', 'Unlimited'))} | "
+                    f"ID: {details.get('airdropId', '?')}"
+                )
+            elif tx_type == 'RAIN':
+                self.tx_logger.info(
+                    f"RAIN | Creator: {details.get('creatorDiscordId', '?')} | "
+                    f"Winners: {', '.join(str(w) for w in details.get('winners', []))} | "
+                    f"Total: {details.get('totalAmountToken', 0):.4f} {currency_name} ({currency}) | "
+                    f"~${details.get('totalAmountUsd', 0):.2f} USD | Sig: {details.get('signature', '?')[:16]}..."
+                )
+            elif tx_type == 'WITHDRAW':
+                self.tx_logger.info(
+                    f"WITHDRAW | From: {details.get('from', '?')} → To: {details.get('to', '?')} | "
+                    f"{details.get('amountToken', 0):.4f} {currency_name} ({currency}) | "
+                    f"~${details.get('amountUsd', 0):.2f} USD | Sig: {details.get('signature', '?')[:16]}..."
+                )
+            elif tx_type == 'SWAP':
+                self.tx_logger.info(
+                    f"SWAP | {details.get('inputAmount', 0)} {details.get('inputToken', '?')} → "
+                    f"{details.get('outputAmount', 0):.4f} {details.get('outputToken', '?')} | "
+                    f"~${details.get('inputUsd', 0):.2f} → ~${details.get('outputUsd', 0):.2f} USD | "
+                    f"Sig: {details.get('signature', '?')[:16]}..."
+                )
+        except Exception as e:
+            logger.error(f"Failed to log transaction: {e}")
+
     async def send_tip(
         self, 
         from_discord_id: str, 
@@ -199,7 +268,12 @@ class FatTipsManager:
             "token": token.upper(),
             "amountType": amount_type
         }
-        return await self._make_request("POST", "/api/send/tip", data=data, operation="send_tip")
+        result = await self._make_request("POST", "/api/send/tip", data=data, operation="send_tip")
+        if "error" not in result:
+            result_with_amount = result.copy()
+            result_with_amount['amount'] = amount
+            self._log_transaction("TIP", result_with_amount)
+        return result
 
     async def send_batch_tip(
         self, 
@@ -218,7 +292,10 @@ class FatTipsManager:
             "token": token.upper(),
             "amountType": amount_type
         }
-        return await self._make_request("POST", "/api/send/batch-tip", data=data, operation="send_batch_tip")
+        result = await self._make_request("POST", "/api/send/batch-tip", data=data, operation="send_batch_tip")
+        if "error" not in result:
+            self._log_transaction("BATCH_TIP", result)
+        return result
 
     async def withdraw(
         self, 
@@ -234,7 +311,10 @@ class FatTipsManager:
             "amount": amount,
             "token": token.upper()
         }
-        return await self._make_request("POST", "/api/send/withdraw", data=data, operation="withdraw")
+        result = await self._make_request("POST", "/api/send/withdraw", data=data, operation="withdraw")
+        if "error" not in result:
+            self._log_transaction("WITHDRAW", result)
+        return result
 
     # Transaction Operations
     async def get_transaction(self, transaction_id: str) -> Dict[str, Any]:
@@ -272,7 +352,10 @@ class FatTipsManager:
         }
         if channel_id:
             data["channelId"] = channel_id
-        return await self._make_request("POST", "/api/airdrops/create", data=data, operation="create_airdrop")
+        result = await self._make_request("POST", "/api/airdrops/create", data=data, operation="create_airdrop")
+        if "error" not in result:
+            self._log_transaction("AIRDROP", result)
+        return result
 
     async def get_airdrop(self, airdrop_id: str) -> Dict[str, Any]:
         """Get airdrop details"""
@@ -307,7 +390,10 @@ class FatTipsManager:
             "winners": winners,
             "amountType": amount_type
         }
-        return await self._make_request("POST", "/api/rain/create", data=data, operation="create_rain")
+        result = await self._make_request("POST", "/api/rain/create", data=data, operation="create_rain")
+        if "error" not in result:
+            self._log_transaction("RAIN", result)
+        return result
 
     # Swap Operations
     async def get_swap_quote(
@@ -339,7 +425,10 @@ class FatTipsManager:
             "amountType": amount_type,
             "slippage": slippage
         }
-        return await self._make_request("POST", "/api/swap/execute", data=data, operation="execute_swap")
+        result = await self._make_request("POST", "/api/swap/execute", data=data, operation="execute_swap")
+        if "error" not in result:
+            self._log_transaction("SWAP", result)
+        return result
 
     async def get_supported_tokens(self, use_cache: bool = True) -> Dict[str, Any]:
         """Get list of supported tokens for swapping"""

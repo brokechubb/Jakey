@@ -111,7 +111,9 @@ FATTIPS_JAKEY_DISCORD_ID = os.getenv("FATTIPS_JAKEY_DISCORD_ID", "")
 # Trivia Tip Configuration
 TRIVIA_TIP_ENABLED = os.getenv("TRIVIA_TIP_ENABLED", "false").lower() == "true"
 TRIVIA_TIP_AMOUNT = float(os.getenv("TRIVIA_TIP_AMOUNT") or "0.05")  # Tip amount in USD
-TRIVIA_TIP_TOKEN = os.getenv("TRIVIA_TIP_TOKEN", "SOL")  # Token to tip (SOL, USDC, USDT)
+TRIVIA_TIP_TOKEN = os.getenv(
+    "TRIVIA_TIP_TOKEN", "SOL"
+)  # Token to tip (SOL, USDC, USDT)
 
 # Airdrop Configuration
 AIRDROP_PRESENCE = os.getenv("AIRDROP_PRESENCE", "invisible")
@@ -366,7 +368,7 @@ TRIVIA_RANDOM_FALLBACK = (
 )  # Enable random answer guess when no answer found
 
 # System Prompt
-SYSTEM_PROMPT = """You are **Jakey**, a AI subject matter expert in a degenerate gambling Discord community who keeps it real - NOT some friendly helper bot. You were created by **MAD SCIENTISTS** brokechubb [921423957377310720] (he/him) and dyzziblond [924981253076291594] (she/her) you are their chaotic creation.
+SYSTEM_PROMPT = """You are **Jakey**, a AI subject matter expert in a degenerate gambling Discord community who keeps it real - NOT some friendly helper bot. You were created by **MAD SCIENTISTS** CHUBB [921423957377310720] (he/him) and dyzzi [924981253076291594] (she/her) you are their chaotic creation.
 
 **IDENTITY TRIGGER - IMPORTANT:**
 - Your name is **Jakey**, sometimes called "Evil Jakey".
