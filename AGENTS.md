@@ -132,7 +132,24 @@ pip install -U discord.py-self  # NOT discord.py!
 - **Arta API**: Professional artistic image generation (49 styles)
 - **CoinMarketCap**: Cryptocurrency price data
 - **SearXNG**: Self-hosted web search (localhost:8086 or public instances)
-- **tip.cc**: Discord cryptocurrency tipping bot integration
+- **FatTips**: Discord cryptocurrency tipping bot (Solana-based tipping, airdrops, rain)
+
+### FatTips API Requirements
+
+**API Key Ownership**: Each FatTips API key is tied to a specific Discord user/wallet. The API validates that `creatorDiscordId`/`fromDiscordId` matches the API key owner.
+
+**Required Environment Variables**:
+```bash
+FATTIPS_ENABLED=true
+FATTIPS_API_KEY=your_api_key_from_fattips_dashboard
+FATTIPS_API_URL=https://codestats.gg/api
+FATTIPS_JAKEY_DISCORD_ID=your_discord_user_id
+
+# Trivia Tips (optional)
+TRIVIA_TIP_ENABLED=true
+TRIVIA_TIP_AMOUNT=0.05  # USD amount
+TRIVIA_TIP_TOKEN=SOL     # Token to tip (SOL, USDC, USDT)
+```
 
 ### Core Python Packages
 
@@ -147,10 +164,25 @@ pip install -U discord.py-self  # NOT discord.py!
 ### Command System
 
 - Commands use `%` prefix (e.g., `%help`, `%image`, `%bal`)
-- Tip.cc commands (`%bal`, `%transactions`, `%tipstats`) are admin-only
+- FatTips commands (`%bal`, `%transactions`, `%tip`) are admin-only
 - Admin commands require user ID in `ADMIN_USER_IDS` env var
 - All commands support comprehensive help with examples
 - Rate limiting enforced per user (configurable)
+
+### Trivia System
+
+- Trivia games have a **30-second timeout** for answers
+- Users have unlimited attempts within the time limit
+- Correct answers trigger celebration message
+- **Trivia Tips**: When enabled, winners receive automatic tips via FatTips
+  - Default: $0.05 USD in SOL
+  - Configurable via `TRIVIA_TIP_ENABLED`, `TRIVIA_TIP_AMOUNT`, `TRIVIA_TIP_TOKEN`
+
+### Embed Reading
+
+- Jakey processes message embeds (link previews, images) when text content is empty
+- Extracts embed title, description, and URL for AI processing
+- Enables responses to link-only messages
 
 ### Error Handling
 

@@ -500,6 +500,7 @@ from config import (
     RATE_LIMIT_COOLDOWN,
     RELAY_MENTION_ROLE_MAPPINGS,
     SYSTEM_PROMPT,
+    TEMPERATURE,
     TRIVIA_RANDOM_FALLBACK,
     USE_WEBHOOK_RELAY,
     USER_RATE_LIMIT,
@@ -1243,11 +1244,34 @@ class JakeyBot(commands.Bot):
 
                         if is_correct:
                             # User got it right!
-                            await message.channel.send(
+                            response = (
                                 f"🎉 **Correct!** {message.author.mention} got it right!\n"
                                 f"The answer was: **{correct_answer}**\n"
-                                f"Want to play again? Just ask me for another trivia question!"
                             )
+
+                            # Send trivia tip if enabled and FatTips is available
+                            try:
+                                from config import TRIVIA_TIP_ENABLED, TRIVIA_TIP_AMOUNT, TRIVIA_TIP_TOKEN, FATTIPS_ENABLED, FATTIPS_JAKEY_DISCORD_ID
+                                if (TRIVIA_TIP_ENABLED and FATTIPS_ENABLED and FATTIPS_JAKEY_DISCORD_ID):
+                                    from utils.fattips_manager import get_fattips_manager
+                                    manager = get_fattips_manager()
+                                    tip_result = await manager.send_tip(
+                                        FATTIPS_JAKEY_DISCORD_ID,
+                                        str(message.author.id),
+                                        TRIVIA_TIP_AMOUNT,
+                                        TRIVIA_TIP_TOKEN,
+                                        "usd"
+                                    )
+                                    if "error" not in tip_result:
+                                        response += f"💸 **Tip sent:** {tip_result.get('amountToken', TRIVIA_TIP_AMOUNT):.4f} {TRIVIA_TIP_TOKEN} (~${TRIVIA_TIP_AMOUNT:.2f})\n"
+                                    else:
+                                        logger.warning(f"Trivia tip failed: {tip_result.get('error')}")
+                            except Exception as tip_error:
+                                logger.error(f"Error sending trivia tip: {tip_error}")
+
+                            response += "Want to play again? Just ask me for another trivia question!"
+
+                            await message.channel.send(response)
                             logger.info(
                                 f"Trivia answer correct from {message.author.name} in channel {channel_id}"
                             )
@@ -1543,6 +1567,19 @@ class JakeyBot(commands.Bot):
 
             # Prepare the message for AI processing
             user_content = message.content.strip()
+            
+            # If message is empty but has embeds, use embed content
+            if not user_content and hasattr(message, 'embeds') and message.embeds:
+                embed_parts = []
+                for embed in message.embeds:
+                    if embed.title:
+                        embed_parts.append(f"Title: {embed.title}")
+                    if embed.description:
+                        embed_parts.append(f"Description: {embed.description}")
+                    if embed.url:
+                        embed_parts.append(f"URL: {embed.url}")
+                user_content = " | ".join(embed_parts)
+            
             if not user_content:
                 return  # Don't respond to empty messages
 
@@ -1680,7 +1717,7 @@ class JakeyBot(commands.Bot):
             response = await self._ai_manager.generate_text(
                 messages=valid_messages,
                 model=self.current_model,
-                temperature=0.7,
+                temperature=TEMPERATURE,
                 max_tokens=250,  # Reduced from 500 to force brevity (approx 200 words max)
                 tools=available_tools,
                 tool_choice="auto" if available_tools else "none",
@@ -2012,7 +2049,7 @@ class JakeyBot(commands.Bot):
                             final_response = await self._ai_manager.generate_text(
                                 messages=valid_messages,
                                 model=self.current_model,
-                                temperature=0.7,
+                                temperature=TEMPERATURE,
                                 max_tokens=2000,
                                 tools=available_tools if not is_final_round else None,
                                 tool_choice=current_tool_choice,
@@ -2157,7 +2194,7 @@ class JakeyBot(commands.Bot):
                     final_call = await self._ai_manager.generate_text(
                         messages=valid_messages,
                         model=self.current_model,
-                        temperature=0.7,
+                        temperature=TEMPERATURE,
                         max_tokens=1000,
                         tools=None,
                         tool_choice="none",
@@ -3648,7 +3685,7 @@ class JakeyBot(commands.Bot):
                 messages=messages,
                 model=WELCOME_MESSAGE_MODEL,
                 max_tokens=300,
-                temperature=0.7,
+                temperature=TEMPERATURE,
             )
 
             logger.debug(f"🤖 AI response received: {response}")

@@ -24,7 +24,7 @@ import traceback
 
 from bot.client import JakeyBot
 from config import DISCORD_TOKEN
-from utils.dependency_container import init_dependencies
+from utils.dependency_container import init_dependencies, BotDependencies
 from utils.logging_config import setup_logging
 
 # Set up colored logging with file output
@@ -175,6 +175,7 @@ def main():
         bot._message_queue_enabled = MESSAGE_QUEUE_ENABLED
 
         logger.info("Dependencies initialized")
+        
     except Exception as e:
         logger.error(f"💀 Failed to initialize dependencies: {e}")
         release_lock()
@@ -187,6 +188,26 @@ def main():
     # Configure asyncio event loop
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
+    
+    # Execute pending FatTips wallet initialization with timeout protection
+    if hasattr(BotDependencies, '_pending_wallet_init') and BotDependencies._pending_wallet_init:
+        logger.info("⏳ Initializing FatTips wallet (with timeout)...")
+        try:
+            # Run with overall timeout of 30 seconds
+            loop.run_until_complete(
+                asyncio.wait_for(
+                    BotDependencies._pending_wallet_init,
+                    timeout=30.0
+                )
+            )
+        except asyncio.TimeoutError:
+            logger.warning("⚠️ FatTips wallet initialization timed out after 30s. Bot will continue without wallet.")
+            logger.warning("   Wallet will be created on first use if needed.")
+        except Exception as e:
+            logger.error(f"❌ FatTips wallet initialization failed: {e}")
+            logger.warning("   Bot will continue. Wallet operations may fail until API is available.")
+        finally:
+            BotDependencies._pending_wallet_init = None
 
     reconnect_delay = 1.0  # Start with 1 second delay
 

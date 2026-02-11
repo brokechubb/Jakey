@@ -87,6 +87,21 @@ class ToolManager:
             "get_user_rate_limit_status": self.get_user_rate_limit_status,
             "get_system_rate_limit_stats": self.get_system_rate_limit_stats,
             "reset_user_rate_limits": self.reset_user_rate_limits,
+            # FatTips tools
+            "fattips_get_balance": self.fattips_get_balance,
+            "fattips_send_tip": self.fattips_send_tip,
+            "fattips_send_batch_tip": self.fattips_send_batch_tip,
+            "fattips_create_airdrop": self.fattips_create_airdrop,
+            "fattips_claim_airdrop": self.fattips_claim_airdrop,
+            "fattips_list_airdrops": self.fattips_list_airdrops,
+            "fattips_create_rain": self.fattips_create_rain,
+            "fattips_get_wallet": self.fattips_get_wallet,
+            "fattips_create_wallet": self.fattips_create_wallet,
+            "fattips_get_transactions": self.fattips_get_transactions,
+            "fattips_withdraw": self.fattips_withdraw,
+            "fattips_get_swap_quote": self.fattips_get_swap_quote,
+            "fattips_execute_swap": self.fattips_execute_swap,
+            "fattips_get_leaderboard": self.fattips_get_leaderboard,
         }
 
         # Initialize Discord tools - will be set later by main.py after bot initialization
@@ -1155,6 +1170,401 @@ class ToolManager:
                             }
                         },
                         "required": ["user_id"],
+                    },
+                },
+            },
+            # FatTips Tools
+            {
+                "type": "function",
+                "function": {
+                    "name": "fattips_get_balance",
+                    "description": "Get a user's FatTips wallet balance including SOL, USDC, and USDT",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "user_id": {
+                                "type": "string",
+                                "description": "Discord user ID to check balance for",
+                            }
+                        },
+                        "required": ["user_id"],
+                    },
+                },
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "fattips_send_tip",
+                    "description": "Send a Solana token tip to another user using FatTips",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "from_user_id": {
+                                "type": "string",
+                                "description": "Discord user ID of the sender (Jakey's ID)",
+                            },
+                            "to_user_id": {
+                                "type": "string",
+                                "description": "Discord user ID of the recipient",
+                            },
+                            "amount": {
+                                "type": "number",
+                                "description": "Amount to tip",
+                            },
+                            "token": {
+                                "type": "string",
+                                "description": "Token to tip in (SOL, USDC, USDT)",
+                                "default": "SOL",
+                            },
+                            "amount_type": {
+                                "type": "string",
+                                "description": "Whether amount is in tokens or USD",
+                                "enum": ["token", "usd"],
+                                "default": "token",
+                            },
+                        },
+                        "required": ["from_user_id", "to_user_id", "amount"],
+                    },
+                },
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "fattips_send_batch_tip",
+                    "description": "Send tips to multiple users at once (Rain) using FatTips",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "from_user_id": {
+                                "type": "string",
+                                "description": "Discord user ID of the sender",
+                            },
+                            "recipients": {
+                                "type": "array",
+                                "description": "List of Discord user IDs to receive tips",
+                                "items": {"type": "string"},
+                            },
+                            "total_amount": {
+                                "type": "number",
+                                "description": "Total amount to distribute among all recipients",
+                            },
+                            "token": {
+                                "type": "string",
+                                "description": "Token to tip in",
+                                "default": "SOL",
+                            },
+                            "amount_type": {
+                                "type": "string",
+                                "description": "Whether amount is in tokens or USD",
+                                "enum": ["token", "usd"],
+                                "default": "token",
+                            },
+                        },
+                        "required": ["from_user_id", "recipients", "total_amount"],
+                    },
+                },
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "fattips_create_airdrop",
+                    "description": "Create a FatTips airdrop that multiple users can claim. If channel_id is provided, the FatTips bot will automatically post a message with a claim button in that channel.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "creator_id": {
+                                "type": "string",
+                                "description": "Discord user ID creating the airdrop",
+                            },
+                            "amount": {
+                                "type": "number",
+                                "description": "Total amount for the airdrop pot",
+                            },
+                            "token": {
+                                "type": "string",
+                                "description": "Token to airdrop (SOL, USDC, USDT)",
+                            },
+                            "duration": {
+                                "type": "string",
+                                "description": "Duration string like '10m', '1h', '30s'",
+                            },
+                            "max_winners": {
+                                "type": "integer",
+                                "description": "Maximum number of winners allowed",
+                            },
+                            "amount_type": {
+                                "type": "string",
+                                "description": "Whether amount is in tokens or USD",
+                                "enum": ["token", "usd"],
+                                "default": "token",
+                            },
+                            "channel_id": {
+                                "type": "string",
+                                "description": "Discord channel ID where the FatTips bot should post the airdrop message with claim button (optional but recommended)",
+                            },
+                        },
+                        "required": ["creator_id", "amount", "token", "duration", "max_winners"],
+                    },
+                },
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "fattips_claim_airdrop",
+                    "description": "Claim a FatTips airdrop",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "airdrop_id": {
+                                "type": "string",
+                                "description": "ID of the airdrop to claim",
+                            },
+                            "user_id": {
+                                "type": "string",
+                                "description": "Discord user ID claiming the airdrop",
+                            },
+                        },
+                        "required": ["airdrop_id", "user_id"],
+                    },
+                },
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "fattips_list_airdrops",
+                    "description": "List available FatTips airdrops",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "status": {
+                                "type": "string",
+                                "description": "Filter by status",
+                                "enum": ["ACTIVE", "EXPIRED", "SETTLED", "RECLAIMED"],
+                                "default": "ACTIVE",
+                            },
+                            "limit": {
+                                "type": "integer",
+                                "description": "Number of results to return",
+                                "default": 10,
+                            },
+                        },
+                    },
+                },
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "fattips_create_rain",
+                    "description": "Create a FatTips rain to specific winners (like trivia winners)",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "creator_id": {
+                                "type": "string",
+                                "description": "Discord user ID creating the rain",
+                            },
+                            "amount": {
+                                "type": "number",
+                                "description": "Total amount to rain",
+                            },
+                            "token": {
+                                "type": "string",
+                                "description": "Token to rain",
+                                "default": "SOL",
+                            },
+                            "winners": {
+                                "type": "array",
+                                "description": "List of Discord user IDs who receive the rain",
+                                "items": {"type": "string"},
+                            },
+                            "amount_type": {
+                                "type": "string",
+                                "description": "Whether amount is in tokens or USD",
+                                "enum": ["token", "usd"],
+                                "default": "token",
+                            },
+                        },
+                        "required": ["creator_id", "amount", "winners"],
+                    },
+                },
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "fattips_get_wallet",
+                    "description": "Get a user's FatTips wallet information",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "user_id": {
+                                "type": "string",
+                                "description": "Discord user ID",
+                            }
+                        },
+                        "required": ["user_id"],
+                    },
+                },
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "fattips_create_wallet",
+                    "description": "Create a new FatTips wallet for a user",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "user_id": {
+                                "type": "string",
+                                "description": "Discord user ID",
+                            }
+                        },
+                        "required": ["user_id"],
+                    },
+                },
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "fattips_get_transactions",
+                    "description": "Get a user's FatTips transaction history",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "user_id": {
+                                "type": "string",
+                                "description": "Discord user ID",
+                            },
+                            "limit": {
+                                "type": "integer",
+                                "description": "Number of transactions to retrieve",
+                                "default": 5,
+                            },
+                        },
+                        "required": ["user_id"],
+                    },
+                },
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "fattips_withdraw",
+                    "description": "Withdraw FatTips funds to an external Solana wallet",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "user_id": {
+                                "type": "string",
+                                "description": "Discord user ID",
+                            },
+                            "destination_address": {
+                                "type": "string",
+                                "description": "External Solana wallet address",
+                            },
+                            "amount": {
+                                "type": ["number", "null"],
+                                "description": "Amount to withdraw (null for max/all)",
+                            },
+                            "token": {
+                                "type": "string",
+                                "description": "Token to withdraw",
+                                "default": "SOL",
+                            },
+                        },
+                        "required": ["user_id", "destination_address"],
+                    },
+                },
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "fattips_get_swap_quote",
+                    "description": "Get a quote for swapping tokens using FatTips",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "input_token": {
+                                "type": "string",
+                                "description": "Token to swap from (e.g., SOL)",
+                            },
+                            "output_token": {
+                                "type": "string",
+                                "description": "Token to swap to (e.g., USDC)",
+                            },
+                            "amount": {
+                                "type": "number",
+                                "description": "Amount to swap",
+                            },
+                            "amount_type": {
+                                "type": "string",
+                                "description": "Whether amount is in tokens or USD",
+                                "enum": ["token", "usd"],
+                                "default": "token",
+                            },
+                        },
+                        "required": ["input_token", "output_token", "amount"],
+                    },
+                },
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "fattips_execute_swap",
+                    "description": "Execute a token swap using FatTips",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "user_id": {
+                                "type": "string",
+                                "description": "Discord user ID",
+                            },
+                            "input_token": {
+                                "type": "string",
+                                "description": "Token to swap from",
+                            },
+                            "output_token": {
+                                "type": "string",
+                                "description": "Token to swap to",
+                            },
+                            "amount": {
+                                "type": "number",
+                                "description": "Amount to swap",
+                            },
+                            "amount_type": {
+                                "type": "string",
+                                "description": "Whether amount is in tokens or USD",
+                                "enum": ["token", "usd"],
+                                "default": "token",
+                            },
+                            "slippage": {
+                                "type": "number",
+                                "description": "Maximum slippage percentage",
+                                "default": 1.0,
+                            },
+                        },
+                        "required": ["user_id", "input_token", "output_token", "amount"],
+                    },
+                },
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "fattips_get_leaderboard",
+                    "description": "Get FatTips leaderboard showing top tippers or receivers",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "type": {
+                                "type": "string",
+                                "description": "Leaderboard type",
+                                "enum": ["tippers", "receivers"],
+                                "default": "tippers",
+                            },
+                            "limit": {
+                                "type": "integer",
+                                "description": "Number of entries to show",
+                                "default": 10,
+                            },
+                        },
                     },
                 },
             },
@@ -2710,6 +3120,36 @@ class ToolManager:
         try:
             tool_func = self.tools[tool_name]
 
+            # Tools that are async and need to be awaited directly
+            async_tools = [
+                # FatTips tools - all are async and make API calls
+                "fattips_get_balance",
+                "fattips_send_tip",
+                "fattips_send_batch_tip",
+                "fattips_create_airdrop",
+                "fattips_claim_airdrop",
+                "fattips_list_airdrops",
+                "fattips_create_rain",
+                "fattips_get_wallet",
+                "fattips_create_wallet",
+                "fattips_get_transactions",
+                "fattips_withdraw",
+                "fattips_get_swap_quote",
+                "fattips_execute_swap",
+                "fattips_get_leaderboard",
+            ]
+
+            # Handle async tools directly
+            if tool_name in async_tools:
+                import asyncio
+                import inspect
+
+                if inspect.iscoroutinefunction(tool_func):
+                    return await tool_func(**mapped_arguments)
+                else:
+                    # If it's not async but in async list, call normally
+                    return tool_func(**mapped_arguments)
+
             # Tools that make network requests and should run in thread pool to avoid blocking
             blocking_tools = [
                 "web_search",
@@ -2976,7 +3416,7 @@ class ToolManager:
 
         # Check if game has timed out
         elapsed = asyncio.get_event_loop().time() - game["start_time"]
-        if elapsed > 60:
+        if elapsed > 30:
             correct_answer = game["question"]["answer_text"]
             if channel_id in self._trivia_games:
                 del self._trivia_games[channel_id]
@@ -3011,6 +3451,522 @@ class ToolManager:
             return True, correct_answer, True
 
         return False, correct_answer, False
+
+    # ==================== FatTips Tools ====================
+
+    async def fattips_get_balance(self, user_id: str) -> str:
+        """Get a user's FatTips wallet balance (SOL, USDC, USDT)
+
+        Args:
+            user_id: Discord user ID to check balance for
+
+        Returns:
+            Formatted balance string or error message
+        """
+        if not self._check_rate_limit("fattips_get_balance", user_id):
+            return "⏰ Rate limit exceeded. Please wait a moment."
+
+        try:
+            from config import FATTIPS_ENABLED
+            if not FATTIPS_ENABLED:
+                return "❌ FatTips integration is disabled."
+
+            from utils.fattips_manager import get_fattips_manager
+
+            manager = get_fattips_manager()
+            balance = await manager.get_formatted_balance(user_id)
+            return balance
+        except Exception as e:
+            logger.error(f"Error in fattips_get_balance: {e}")
+            return f"❌ Error getting balance: {str(e)}"
+
+    async def fattips_send_tip(self, from_user_id: str, to_user_id: str, amount: float, token: str = "SOL", amount_type: str = "token") -> str:
+        """Send a tip to another user using FatTips
+
+        Args:
+            from_user_id: Discord user ID of the sender (Jakey's ID)
+            to_user_id: Discord user ID of the recipient
+            amount: Amount to tip
+            token: Token to tip in (SOL, USDC, USDT)
+            amount_type: "token" or "usd"
+
+        Returns:
+            Success message with transaction details or error
+        """
+        if not self._check_rate_limit("fattips_send_tip", from_user_id):
+            return "⏰ Rate limit exceeded. Please wait a moment."
+
+        try:
+            from config import FATTIPS_ENABLED, FATTIPS_JAKEY_DISCORD_ID
+            if not FATTIPS_ENABLED:
+                return "❌ FatTips integration is disabled."
+
+            from utils.fattips_manager import get_fattips_manager
+
+            manager = get_fattips_manager()
+            # Use configured Jakey ID if from_user_id not provided
+            sender_id = from_user_id or FATTIPS_JAKEY_DISCORD_ID
+            if not sender_id:
+                return "❌ No sender ID configured for FatTips."
+
+            result = await manager.send_tip(sender_id, to_user_id, amount, token, amount_type)
+            
+            if "error" in result:
+                return f"❌ Tip failed: {result['error']}"
+            
+            return f"💸 **Tip sent successfully!**\nFrom: <@{result['from']}>\nTo: <@{result['to']}>\nAmount: {result['amountToken']} {result['token']} (~${result['amountUsd']:.2f})\n[View on Solscan]({result.get('solscanUrl', '#')})"
+        except Exception as e:
+            logger.error(f"Error in fattips_send_tip: {e}")
+            return f"❌ Error sending tip: {str(e)}"
+
+    async def fattips_send_batch_tip(self, from_user_id: str, recipients: list, total_amount: float, token: str = "SOL", amount_type: str = "token") -> str:
+        """Send tips to multiple users at once (Rain)
+
+        Args:
+            from_user_id: Discord user ID of the sender
+            recipients: List of Discord user IDs to receive tips
+            total_amount: Total amount to distribute
+            token: Token to tip in
+            amount_type: "token" or "usd"
+
+        Returns:
+            Success message with rain details or error
+        """
+        if not self._check_rate_limit("fattips_send_batch_tip", from_user_id):
+            return "⏰ Rate limit exceeded. Please wait a moment."
+
+        try:
+            from config import FATTIPS_ENABLED, FATTIPS_JAKEY_DISCORD_ID
+            if not FATTIPS_ENABLED:
+                return "❌ FatTips integration is disabled."
+
+            from utils.fattips_manager import get_fattips_manager
+
+            manager = get_fattips_manager()
+            sender_id = from_user_id or FATTIPS_JAKEY_DISCORD_ID
+            if not sender_id:
+                return "❌ No sender ID configured for FatTips."
+
+            result = await manager.send_batch_tip(sender_id, recipients, total_amount, token, amount_type)
+            
+            if "error" in result:
+                return f"❌ Batch tip failed: {result['error']}"
+            
+            winner_count = len(result.get('recipients', []))
+            amount_per_user = result.get('amountPerUser', 0)
+            
+            return f"🌧️ **Rain sent successfully!**\nRecipients: {winner_count}\nAmount per user: {amount_per_user:.4f} {result['token']}\nTotal: {result['totalAmountToken']} {result['token']} (~${result['totalAmountUsd']:.2f})\n[View on Solscan]({result.get('solscanUrl', '#')})"
+        except Exception as e:
+            logger.error(f"Error in fattips_send_batch_tip: {e}")
+            return f"❌ Error sending batch tip: {str(e)}"
+
+    async def fattips_create_airdrop(self, creator_id: str, amount: float, token: str, duration: str, max_winners: int, amount_type: str = "token", channel_id: str = None) -> str:
+        """Create a FatTips airdrop
+
+        Args:
+            creator_id: Discord user ID creating the airdrop
+            amount: Total amount for the airdrop
+            token: Token to airdrop
+            duration: Duration string (e.g., "10m", "1h")
+            max_winners: Maximum number of winners
+            amount_type: "token" or "usd"
+            channel_id: Discord channel ID to post the airdrop message with claim button (optional)
+
+        Returns:
+            Success message with airdrop ID or error
+        """
+        if not self._check_rate_limit("fattips_create_airdrop", creator_id):
+            return "⏰ Rate limit exceeded. Please wait a moment."
+
+        try:
+            from config import FATTIPS_ENABLED, FATTIPS_JAKEY_DISCORD_ID
+            if not FATTIPS_ENABLED:
+                return "❌ FatTips integration is disabled."
+
+            from utils.fattips_manager import get_fattips_manager
+
+            manager = get_fattips_manager()
+            creator = creator_id or FATTIPS_JAKEY_DISCORD_ID
+            if not creator:
+                return "❌ No creator ID configured for FatTips."
+
+            result = await manager.create_airdrop(creator, amount, token, duration, max_winners, amount_type, channel_id)
+            
+            if "error" in result:
+                error_msg = result['error']
+                if "own wallet" in error_msg.lower():
+                    return f"❌ **Airdrop creation failed**: The FatTips API key is tied to a different wallet. Airdrops can only be created from the wallet that owns the API key.\n\n**Fix options:**\n1. Use an API key from Jakey's FatTips wallet\n2. Or create the airdrop directly via FatTips dashboard"
+                return f"❌ Airdrop creation failed: {error_msg}"
+            
+            response = f"🎁 **Airdrop created successfully!**\nID: `{result['airdropId']}`\nPot: {result['potSize']} {result['token']} (~${result['totalUsd']:.2f})\nMax Winners: {result.get('maxWinners', result.get('max_winners', 'Unlimited'))}\nExpires: {result.get('expiresAt', 'Unknown')}"
+            
+            if channel_id:
+                response += "\n\n✅ **Airdrop message with claim button will be posted in this channel by the FatTips bot!**"
+            
+            return response
+        except Exception as e:
+            logger.error(f"Error in fattips_create_airdrop: {e}")
+            return f"❌ Error creating airdrop: {str(e)}"
+
+    async def fattips_claim_airdrop(self, airdrop_id: str, user_id: str) -> str:
+        """Claim a FatTips airdrop
+
+        Args:
+            airdrop_id: ID of the airdrop to claim
+            user_id: Discord user ID claiming the airdrop
+
+        Returns:
+            Success message with claim details or error
+        """
+        if not self._check_rate_limit("fattips_claim_airdrop", user_id):
+            return "⏰ Rate limit exceeded. Please wait a moment."
+
+        try:
+            from config import FATTIPS_ENABLED
+            if not FATTIPS_ENABLED:
+                return "❌ FatTips integration is disabled."
+
+            from utils.fattips_manager import get_fattips_manager
+
+            manager = get_fattips_manager()
+            result = await manager.claim_airdrop(airdrop_id, user_id)
+            
+            if "error" in result:
+                return f"❌ Airdrop claim failed: {result['error']}"
+            
+            return f"🎉 **Airdrop claimed!**\nYou received: {result['amountReceived']:.4f} tokens\n[View on Solscan]({result.get('solscanUrl', '#')})"
+        except Exception as e:
+            logger.error(f"Error in fattips_claim_airdrop: {e}")
+            return f"❌ Error claiming airdrop: {str(e)}"
+
+    async def fattips_list_airdrops(self, status: str = "ACTIVE", limit: int = 10) -> str:
+        """List available FatTips airdrops
+
+        Args:
+            status: Filter by status (ACTIVE, EXPIRED, SETTLED, RECLAIMED)
+            limit: Number of results to return
+
+        Returns:
+            Formatted list of airdrops or error message
+        """
+        try:
+            from config import FATTIPS_ENABLED
+            if not FATTIPS_ENABLED:
+                return "❌ FatTips integration is disabled."
+
+            from utils.fattips_manager import get_fattips_manager
+
+            manager = get_fattips_manager()
+            result = await manager.list_airdrops(status, limit)
+            
+            if "error" in result:
+                return f"❌ Failed to list airdrops: {result['error']}"
+            
+            airdrops = result.get('airdrops', [])
+            total = result.get('total', 0)
+            
+            if not airdrops:
+                return f"📭 No {status.lower()} airdrops found."
+            
+            lines = [f"🎁 **{status.title()} Airdrops** (showing {len(airdrops)} of {total}):\n"]
+            
+            for drop in airdrops:
+                lines.append(f"ID: `{drop['id']}`")
+                lines.append(f"  Pot: {drop['potSize']} tokens")
+                lines.append(f"  Participants: {drop['participantCount']}/{drop['maxParticipants']}")
+                lines.append(f"  Expires: {drop.get('expiresAt', 'Unknown')}")
+                lines.append("")
+            
+            return "\n".join(lines)
+        except Exception as e:
+            logger.error(f"Error in fattips_list_airdrops: {e}")
+            return f"❌ Error listing airdrops: {str(e)}"
+
+    async def fattips_create_rain(self, creator_id: str, amount: float, token: str, winners: list, amount_type: str = "token") -> str:
+        """Create a FatTips rain (trivia winners, etc.)
+
+        Args:
+            creator_id: Discord user ID creating the rain
+            amount: Total amount to rain
+            token: Token to rain
+            winners: List of Discord user IDs who receive the rain
+            amount_type: "token" or "usd"
+
+        Returns:
+            Success message with rain details or error
+        """
+        if not self._check_rate_limit("fattips_create_rain", creator_id):
+            return "⏰ Rate limit exceeded. Please wait a moment."
+
+        try:
+            from config import FATTIPS_ENABLED, FATTIPS_JAKEY_DISCORD_ID
+            if not FATTIPS_ENABLED:
+                return "❌ FatTips integration is disabled."
+
+            from utils.fattips_manager import get_fattips_manager
+
+            manager = get_fattips_manager()
+            creator = creator_id or FATTIPS_JAKEY_DISCORD_ID
+            if not creator:
+                return "❌ No creator ID configured for FatTips."
+
+            result = await manager.create_rain(creator, amount, token, winners, amount_type)
+            
+            if "error" in result:
+                return f"❌ Rain creation failed: {result['error']}"
+            
+            winner_list = [f"<@{w['discordId']}>" for w in result.get('winners', [])]
+            
+            return f"🌧️ **Rain sent successfully!**\nWinners: {', '.join(winner_list)}\nAmount per winner: {result['amountPerUser']:.4f} {result['token']}\nTotal: {result['totalAmountToken']} {result['token']} (~${result['totalAmountUsd']:.2f})\n[View on Solscan]({result.get('solscanUrl', '#')})"
+        except Exception as e:
+            logger.error(f"Error in fattips_create_rain: {e}")
+            return f"❌ Error creating rain: {str(e)}"
+
+    async def fattips_get_wallet(self, user_id: str) -> str:
+        """Get a user's FatTips wallet information
+
+        Args:
+            user_id: Discord user ID
+
+        Returns:
+            Wallet information or error message
+        """
+        if not self._check_rate_limit("fattips_get_wallet", user_id):
+            return "⏰ Rate limit exceeded. Please wait a moment."
+
+        try:
+            from config import FATTIPS_ENABLED
+            if not FATTIPS_ENABLED:
+                return "❌ FatTips integration is disabled."
+
+            from utils.fattips_manager import get_fattips_manager
+
+            manager = get_fattips_manager()
+            result = await manager.get_wallet(user_id)
+            
+            if "error" in result:
+                return f"❌ Wallet lookup failed: {result['error']}"
+            
+            pubkey = result.get('walletPubkey', 'Unknown')
+            has_mnemonic = result.get('hasMnemonic', False)
+            created = result.get('createdAt', 'Unknown')
+            
+            return f"💼 **Wallet Info**\nPublic Key: `{pubkey}`\nHas Recovery Phrase: {'Yes' if has_mnemonic else 'No'}\nCreated: {created}"
+        except Exception as e:
+            logger.error(f"Error in fattips_get_wallet: {e}")
+            return f"❌ Error getting wallet: {str(e)}"
+
+    async def fattips_create_wallet(self, user_id: str) -> str:
+        """Create a new FatTips wallet for a user
+
+        Args:
+            user_id: Discord user ID
+
+        Returns:
+            Success message with wallet details (WARNING: includes private key - handle carefully)
+        """
+        if not self._check_rate_limit("fattips_create_wallet", user_id):
+            return "⏰ Rate limit exceeded. Please wait a moment."
+
+        try:
+            from config import FATTIPS_ENABLED
+            if not FATTIPS_ENABLED:
+                return "❌ FatTips integration is disabled."
+
+            from utils.fattips_manager import get_fattips_manager
+
+            manager = get_fattips_manager()
+            result = await manager.create_wallet(user_id)
+            
+            if "error" in result:
+                return f"❌ Wallet creation failed: {result['error']}"
+            
+            # WARNING: This contains sensitive data - only show in DMs
+            return f"⚠️ **Wallet Created!** (SENSITIVE DATA - CHECK DMs)\nPublic Key: `{result['walletPubkey']}`\n⚠️ Private key and recovery phrase have been sent via DM. NEVER share these!"
+        except Exception as e:
+            logger.error(f"Error in fattips_create_wallet: {e}")
+            return f"❌ Error creating wallet: {str(e)}"
+
+    async def fattips_get_transactions(self, user_id: str, limit: int = 5) -> str:
+        """Get a user's FatTips transaction history
+
+        Args:
+            user_id: Discord user ID
+            limit: Number of transactions to retrieve (default: 5)
+
+        Returns:
+            Formatted transaction history or error message
+        """
+        if not self._check_rate_limit("fattips_get_transactions", user_id):
+            return "⏰ Rate limit exceeded. Please wait a moment."
+
+        try:
+            from config import FATTIPS_ENABLED
+            if not FATTIPS_ENABLED:
+                return "❌ FatTips integration is disabled."
+
+            from utils.fattips_manager import get_fattips_manager
+
+            manager = get_fattips_manager()
+            return await manager.get_formatted_transactions(user_id, limit)
+        except Exception as e:
+            logger.error(f"Error in fattips_get_transactions: {e}")
+            return f"❌ Error getting transactions: {str(e)}"
+
+    async def fattips_withdraw(self, user_id: str, destination_address: str, amount: Optional[float], token: str = "SOL") -> str:
+        """Withdraw funds to an external wallet
+
+        Args:
+            user_id: Discord user ID
+            destination_address: External Solana wallet address
+            amount: Amount to withdraw (None for max/all)
+            token: Token to withdraw
+
+        Returns:
+            Success message with transaction details or error
+        """
+        if not self._check_rate_limit("fattips_withdraw", user_id):
+            return "⏰ Rate limit exceeded. Please wait a moment."
+
+        try:
+            from config import FATTIPS_ENABLED, FATTIPS_JAKEY_DISCORD_ID
+            if not FATTIPS_ENABLED:
+                return "❌ FatTips integration is disabled."
+
+            from utils.fattips_manager import get_fattips_manager
+
+            manager = get_fattips_manager()
+            withdraw_user = user_id or FATTIPS_JAKEY_DISCORD_ID
+            if not withdraw_user:
+                return "❌ No user ID configured for FatTips withdrawal."
+
+            result = await manager.withdraw(withdraw_user, destination_address, amount, token)
+            
+            if "error" in result:
+                return f"❌ Withdrawal failed: {result['error']}"
+            
+            amount_str = f"{result['amountToken']:.4f}" if result['amountToken'] else "ALL"
+            
+            return f"🏧 **Withdrawal successful!**\nAmount: {amount_str} {result['token']} (~${result['amountUsd']:.2f})\nTo: `{result['to']}`\n[View on Solscan]({result.get('solscanUrl', '#')})"
+        except Exception as e:
+            logger.error(f"Error in fattips_withdraw: {e}")
+            return f"❌ Error withdrawing: {str(e)}"
+
+    async def fattips_get_swap_quote(self, input_token: str, output_token: str, amount: float, amount_type: str = "token") -> str:
+        """Get a quote for swapping tokens
+
+        Args:
+            input_token: Token to swap from (e.g., SOL)
+            output_token: Token to swap to (e.g., USDC)
+            amount: Amount to swap
+            amount_type: "token" or "usd"
+
+        Returns:
+            Quote details or error message
+        """
+        try:
+            from config import FATTIPS_ENABLED
+            if not FATTIPS_ENABLED:
+                return "❌ FatTips integration is disabled."
+
+            from utils.fattips_manager import get_fattips_manager
+
+            manager = get_fattips_manager()
+            result = await manager.get_swap_quote(input_token, output_token, amount, amount_type)
+            
+            if "error" in result:
+                return f"❌ Quote failed: {result['error']}"
+            
+            return f"🔄 **Swap Quote**\n{result['inputAmount']} {result['inputToken']} → {result['outputAmount']:.4f} {result['outputToken']}\nInput Value: ${result['inputUsd']:.2f}\nOutput Value: ${result['outputUsd']:.2f}\nPrice Impact: {result.get('priceImpact', 0):.2f}%"
+        except Exception as e:
+            logger.error(f"Error in fattips_get_swap_quote: {e}")
+            return f"❌ Error getting quote: {str(e)}"
+
+    async def fattips_execute_swap(self, user_id: str, input_token: str, output_token: str, amount: float, amount_type: str = "token", slippage: float = 1.0) -> str:
+        """Execute a token swap
+
+        Args:
+            user_id: Discord user ID
+            input_token: Token to swap from
+            output_token: Token to swap to
+            amount: Amount to swap
+            amount_type: "token" or "usd"
+            slippage: Maximum slippage percentage (default: 1.0%)
+
+        Returns:
+            Success message with transaction details or error
+        """
+        if not self._check_rate_limit("fattips_execute_swap", user_id):
+            return "⏰ Rate limit exceeded. Please wait a moment."
+
+        try:
+            from config import FATTIPS_ENABLED, FATTIPS_JAKEY_DISCORD_ID
+            if not FATTIPS_ENABLED:
+                return "❌ FatTips integration is disabled."
+
+            from utils.fattips_manager import get_fattips_manager
+
+            manager = get_fattips_manager()
+            swap_user = user_id or FATTIPS_JAKEY_DISCORD_ID
+            if not swap_user:
+                return "❌ No user ID configured for FatTips swap."
+
+            result = await manager.execute_swap(swap_user, input_token, output_token, amount, amount_type, slippage)
+            
+            if "error" in result:
+                return f"❌ Swap failed: {result['error']}"
+            
+            return f"🔄 **Swap executed!**\n{result['inputAmount']} {result['inputToken']} → {result['outputAmount']:.4f} {result['outputToken']}\nInput: ${result['inputUsd']:.2f} → Output: ${result['outputUsd']:.2f}\nPrice Impact: {result.get('priceImpact', 0):.2f}%\n[View on Solscan]({result.get('solscanUrl', '#')})"
+        except Exception as e:
+            logger.error(f"Error in fattips_execute_swap: {e}")
+            return f"❌ Error executing swap: {str(e)}"
+
+    async def fattips_get_leaderboard(self, type: str = "tippers", limit: int = 10) -> str:
+        """Get FatTips leaderboard
+
+        Args:
+            type: Leaderboard type - "tippers" or "receivers"
+            limit: Number of entries to show
+
+        Returns:
+            Formatted leaderboard or error message
+        """
+        try:
+            from config import FATTIPS_ENABLED
+            if not FATTIPS_ENABLED:
+                return "❌ FatTips integration is disabled."
+
+            from utils.fattips_manager import get_fattips_manager
+
+            manager = get_fattips_manager()
+            
+            if type.lower() == "tippers":
+                result = await manager.get_top_tippers(limit)
+                title = "🏆 Top Tippers"
+                value_key = "totalTippedUsd"
+            else:
+                result = await manager.get_top_receivers(limit)
+                title = "🏆 Top Receivers"
+                value_key = "totalReceivedUsd"
+            
+            if "error" in result:
+                return f"❌ Failed to get leaderboard: {result['error']}"
+            
+            if not result:
+                return f"📭 No {type} found on the leaderboard."
+            
+            lines = [f"{title}:\n"]
+            
+            for i, entry in enumerate(result[:limit], 1):
+                medal = {1: "🥇", 2: "🥈", 3: "🥉"}.get(i, f"#{i}")
+                user_id = entry.get('discordId', 'Unknown')
+                value = entry.get(value_key, 0)
+                lines.append(f"{medal} <@{user_id}>: ${value:.2f}")
+            
+            return "\n".join(lines)
+        except Exception as e:
+            logger.error(f"Error in fattips_get_leaderboard: {e}")
+            return f"❌ Error getting leaderboard: {str(e)}"
 
 
 # Async helper functions for MCP operations
