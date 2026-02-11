@@ -40,6 +40,16 @@ class ToolManager:
             }
         )
 
+        # DM context tracking - set before tool calls in DM messages
+        self._in_dm_context = False
+        self._dm_channel_id = None
+
+    def _check_dm_restriction(self, tool_name: str) -> Optional[str]:
+        """Check if tool is restricted in DM context"""
+        if self._in_dm_context:
+            return f"❌ {tool_name} cannot be used in DMs. Please use this in a server channel."
+        return None
+
         self.tools = {
             "set_reminder": self.set_reminder,
             "list_reminders": self.list_reminders,
@@ -3496,6 +3506,11 @@ class ToolManager:
         if not self._check_rate_limit("fattips_send_tip", from_user_id):
             return "⏰ Rate limit exceeded. Please wait a moment."
 
+        # Check for DM restriction
+        dm_error = self._check_dm_restriction("Tip")
+        if dm_error:
+            return dm_error
+
         try:
             from config import FATTIPS_ENABLED, FATTIPS_JAKEY_DISCORD_ID
             if not FATTIPS_ENABLED:
@@ -3534,6 +3549,11 @@ class ToolManager:
         """
         if not self._check_rate_limit("fattips_send_batch_tip", from_user_id):
             return "⏰ Rate limit exceeded. Please wait a moment."
+
+        # Check for DM restriction
+        dm_error = self._check_dm_restriction("Rain/Batch Tip")
+        if dm_error:
+            return dm_error
 
         try:
             from config import FATTIPS_ENABLED, FATTIPS_JAKEY_DISCORD_ID
@@ -3577,6 +3597,11 @@ class ToolManager:
         """
         if not self._check_rate_limit("fattips_create_airdrop", creator_id):
             return "⏰ Rate limit exceeded. Please wait a moment."
+
+        # Check for DM restriction
+        dm_error = self._check_dm_restriction("Airdrop")
+        if dm_error:
+            return dm_error
 
         try:
             from config import FATTIPS_ENABLED, FATTIPS_JAKEY_DISCORD_ID
@@ -3697,6 +3722,11 @@ class ToolManager:
         """
         if not self._check_rate_limit("fattips_create_rain", creator_id):
             return "⏰ Rate limit exceeded. Please wait a moment."
+
+        # Check for DM restriction
+        dm_error = self._check_dm_restriction("Rain")
+        if dm_error:
+            return dm_error
 
         try:
             from config import FATTIPS_ENABLED, FATTIPS_JAKEY_DISCORD_ID
@@ -3828,6 +3858,11 @@ class ToolManager:
         if not self._check_rate_limit("fattips_withdraw", user_id):
             return "⏰ Rate limit exceeded. Please wait a moment."
 
+        # Check for DM restriction
+        dm_error = self._check_dm_restriction("Withdrawal")
+        if dm_error:
+            return dm_error
+
         try:
             from config import FATTIPS_ENABLED, FATTIPS_JAKEY_DISCORD_ID
             if not FATTIPS_ENABLED:
@@ -3898,6 +3933,11 @@ class ToolManager:
         """
         if not self._check_rate_limit("fattips_execute_swap", user_id):
             return "⏰ Rate limit exceeded. Please wait a moment."
+
+        # Check for DM restriction
+        dm_error = self._check_dm_restriction("Swap")
+        if dm_error:
+            return dm_error
 
         try:
             from config import FATTIPS_ENABLED, FATTIPS_JAKEY_DISCORD_ID

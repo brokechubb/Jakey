@@ -1561,6 +1561,12 @@ class JakeyBot(commands.Bot):
             except (discord.NotFound, discord.Forbidden, discord.HTTPException):
                 pass  # Message deleted or no permission
 
+            # Set DM context flag for tool restrictions
+            is_dm = message.guild is None
+            if hasattr(self, 'tool_manager') and self.tool_manager:
+                self.tool_manager._in_dm_context = is_dm
+                self.tool_manager._dm_channel_id = str(message.channel.id) if is_dm else None
+
             # Use global AI provider manager singleton
             if not hasattr(self, "_ai_manager"):
                 self._ai_manager = ai_provider_manager
