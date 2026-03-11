@@ -278,6 +278,97 @@ class OpenAICompatibleAPI:
                         logger.error(f"OpenAI-Compatible: API error - {error_msg}")
                         return {"error": error_msg}
                     
+                    # Validate response has expected OpenAI format
+                    if isinstance(result, dict) and "choices" not in result:
+                        # Non-standard response format (e.g. {"status": ..., "msg": ..., "body": ...})
+                        # First check if this is an API error disguised as a 200 response
+                        body = result.get("body")
+                        msg = result.get("msg")
+                        status = result.get("status")
+
+                        # Detect error messages in the response text fields
+                        _error_indicators = [
+                            "blocked", "unauthorized", "forbidden",
+                            "invalid key", "invalid api", "access denied",
+                            "quota exceeded", "rate limit", "too many requests",
+                            "authentication", "permission denied",
+                            "service unavailable", "internal error",
+                        ]
+
+                        def _is_api_error_text(text):
+                            """Check if text looks like an API error message."""
+                            if not isinstance(text, str) or not text.strip():
+                                return False
+                            lower = text.lower()
+                            return any(ind in lower for ind in _error_indicators)
+
+                        # Check if status explicitly indicates an error
+                        _status_is_error = (
+                            isinstance(status, (int, float)) and status >= 400
+                        ) or (
+                            isinstance(status, str) and status.lower() in (
+                                "error", "fail", "failed", "blocked",
+                                "unauthorized", "forbidden",
+                            )
+                        )
+
+                        # Determine the text content from body or msg
+                        _text_content = None
+                        if isinstance(body, str) and body.strip():
+                            _text_content = body.strip()
+                        elif isinstance(msg, str) and msg.strip():
+                            _text_content = msg.strip()
+
+                        # If status indicates error OR the text looks like an error,
+                        # treat the whole response as an error for fallback
+                        if _status_is_error or _is_api_error_text(_text_content) or _is_api_error_text(str(msg)):
+                            error_msg = _text_content or str(msg) or "Unknown API error (non-standard format)"
+                            logger.error(
+                                f"OpenAI-Compatible: API error in non-standard response "
+                                f"(status={status}, keys={list(result.keys())}): {error_msg}"
+                            )
+                            return {"error": error_msg}
+
+                        # Not an error - try to salvage real content
+                        if isinstance(body, dict) and "choices" in body:
+                            # The actual OpenAI response may be nested inside "body"
+                            logger.warning(
+                                f"OpenAI-Compatible: Response wrapped in non-standard envelope "
+                                f"(keys: {list(result.keys())}). Extracting from 'body'."
+                            )
+                            result = body
+                        elif _text_content:
+                            # body or msg contains plain text content - wrap in OpenAI format
+                            source_key = "body" if isinstance(body, str) and body.strip() else "msg"
+                            logger.warning(
+                                f"OpenAI-Compatible: Non-standard response with text in '{source_key}' "
+                                f"(keys: {list(result.keys())}). Wrapping in OpenAI format."
+                            )
+                            result = {
+                                "choices": [{
+                                    "message": {
+                                        "role": "assistant",
+                                        "content": _text_content,
+                                    },
+                                    "finish_reason": "stop",
+                                }]
+                            }
+                        else:
+                            # Completely unrecognizable format - treat as error
+                            error_msg = (
+                                f"Non-standard API response format "
+                                f"(keys: {list(result.keys())}). "
+                                f"Expected 'choices' key."
+                            )
+                            logger.error(f"OpenAI-Compatible: {error_msg}")
+                            if attempt < max_retries:
+                                logger.warning(
+                                    f"OpenAI-Compatible: Retrying due to malformed response..."
+                                )
+                                time.sleep(retry_delay * (2 ** attempt))
+                                continue
+                            return {"error": error_msg}
+
                     # Log tool call information
                     if isinstance(result, dict) and "choices" in result:
                         choice = result.get("choices", [{}])[0]

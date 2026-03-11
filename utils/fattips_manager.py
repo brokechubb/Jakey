@@ -210,43 +210,50 @@ class FatTipsManager:
             currency = details.get('token', details.get('tokenMint', 'UNKNOWN'))
             currency_name = self.CURRENCY_NAMES.get(currency.upper(), currency)
             
+            # Helper function to safely format amounts
+            def fmt(val, decimals=4):
+                try:
+                    return f"{float(val):.{decimals}f}"
+                except (ValueError, TypeError):
+                    return str(val)
+            
             if tx_type == 'TIP':
                 self.tx_logger.info(
                     f"TIP | From: {details.get('from', '?')} → To: {details.get('to', '?')} | "
-                    f"{details.get('amountToken', details.get('amount', 0)):.4f} {currency_name} ({currency}) | "
-                    f"~${details.get('amountUsd', 0):.2f} USD | Sig: {details.get('signature', '?')[:16]}..."
+                    f"{fmt(details.get('amountToken', details.get('amount', 0)))} {currency_name} ({currency}) | "
+                    f"~${fmt(details.get('amountUsd', 0), 2)} USD | Sig: {details.get('signature', '?')[:16]}..."
                 )
             elif tx_type == 'BATCH_TIP':
                 self.tx_logger.info(
                     f"BATCH_TIP | From: {details.get('from', '?')} | Recipients: {len(details.get('recipients', []))} | "
-                    f"Total: {details.get('totalAmountToken', 0):.4f} {currency_name} ({currency}) | "
-                    f"~${details.get('totalAmountUsd', 0):.2f} USD | Sig: {details.get('signature', '?')[:16]}..."
+                    f"Total: {fmt(details.get('totalAmountToken', 0))} {currency_name} ({currency}) | "
+                    f"~${fmt(details.get('totalAmountUsd', 0), 2)} USD | Sig: {details.get('signature', '?')[:16]}..."
                 )
             elif tx_type == 'AIRDROP':
                 self.tx_logger.info(
                     f"AIRDROP | Creator: {details.get('creatorDiscordId', details.get('creatorId', '?'))} | "
-                    f"Pot: {details.get('potSize', 0):.4f} {currency_name} ({currency}) | "
-                    f"~${details.get('totalUsd', 0):.2f} USD | Max Winners: {details.get('maxWinners', details.get('max_winners', 'Unlimited'))} | "
+                    f"Pot: {fmt(details.get('potSize', 0))} {currency_name} ({currency}) | "
+                    f"~${fmt(details.get('totalUsd', 0), 2)} USD | Max Winners: {details.get('maxWinners', details.get('max_winners', 'Unlimited'))} | "
                     f"ID: {details.get('airdropId', '?')}"
                 )
             elif tx_type == 'RAIN':
                 self.tx_logger.info(
                     f"RAIN | Creator: {details.get('creatorDiscordId', '?')} | "
                     f"Winners: {', '.join(str(w) for w in details.get('winners', []))} | "
-                    f"Total: {details.get('totalAmountToken', 0):.4f} {currency_name} ({currency}) | "
-                    f"~${details.get('totalAmountUsd', 0):.2f} USD | Sig: {details.get('signature', '?')[:16]}..."
+                    f"Total: {fmt(details.get('totalAmountToken', 0))} {currency_name} ({currency}) | "
+                    f"~${fmt(details.get('totalAmountUsd', 0), 2)} USD | Sig: {details.get('signature', '?')[:16]}..."
                 )
             elif tx_type == 'WITHDRAW':
                 self.tx_logger.info(
                     f"WITHDRAW | From: {details.get('from', '?')} → To: {details.get('to', '?')} | "
-                    f"{details.get('amountToken', 0):.4f} {currency_name} ({currency}) | "
-                    f"~${details.get('amountUsd', 0):.2f} USD | Sig: {details.get('signature', '?')[:16]}..."
+                    f"{fmt(details.get('amountToken', 0))} {currency_name} ({currency}) | "
+                    f"~${fmt(details.get('amountUsd', 0), 2)} USD | Sig: {details.get('signature', '?')[:16]}..."
                 )
             elif tx_type == 'SWAP':
                 self.tx_logger.info(
                     f"SWAP | {details.get('inputAmount', 0)} {details.get('inputToken', '?')} → "
-                    f"{details.get('outputAmount', 0):.4f} {details.get('outputToken', '?')} | "
-                    f"~${details.get('inputUsd', 0):.2f} → ~${details.get('outputUsd', 0):.2f} USD | "
+                    f"{fmt(details.get('outputAmount', 0))} {details.get('outputToken', '?')} | "
+                    f"~${fmt(details.get('inputUsd', 0), 2)} → ~${fmt(details.get('outputUsd', 0), 2)} USD | "
                     f"Sig: {details.get('signature', '?')[:16]}..."
                 )
         except Exception as e:
@@ -512,7 +519,11 @@ class FatTipsManager:
         for token, amount in balances.items():
             token_upper = token.upper()
             currency_name = self.CURRENCY_NAMES.get(token_upper, token_upper)
-            lines.append(f"**{currency_name} ({token_upper})**: {amount:.4f}")
+            try:
+                amount_float = float(amount)
+                lines.append(f"**{currency_name} ({token_upper})**: {amount_float:.4f}")
+            except (ValueError, TypeError):
+                lines.append(f"**{currency_name} ({token_upper})**: {amount}")
 
         return "\n".join(lines)
 
@@ -541,7 +552,15 @@ class FatTipsManager:
         token_upper = token.upper()
         currency_name = self.CURRENCY_NAMES.get(token_upper, token_upper)
 
-        result = f"{emoji} {status_emoji} **{tx_type.title()}**: {amount:.4f} {currency_name} ({token_upper}) (~${amount_usd:.2f})"
+        # Ensure amounts are numbers for formatting
+        try:
+            amount_float = float(amount)
+            amount_usd_float = float(amount_usd)
+        except (ValueError, TypeError):
+            amount_float = 0.0
+            amount_usd_float = 0.0
+
+        result = f"{emoji} {status_emoji} **{tx_type.title()}**: {amount_float:.4f} {currency_name} ({token_upper}) (~${amount_usd_float:.2f})"
         
         if from_id and from_id != "?":
             result += f"\n   From: <@{from_id}>"
@@ -660,7 +679,11 @@ class FatTipsManager:
         for token, amount in balances.items():
             token_upper = token.upper()
             currency_name = self.CURRENCY_NAMES.get(token_upper, token_upper)
-            lines.append(f"**{currency_name} ({token_upper})**: {amount:.4f}")
+            try:
+                amount_float = float(amount)
+                lines.append(f"**{currency_name} ({token_upper})**: {amount_float:.4f}")
+            except (ValueError, TypeError):
+                lines.append(f"**{currency_name} ({token_upper})**: {amount}")
 
         return "\n".join(lines)
 

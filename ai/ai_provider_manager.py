@@ -374,33 +374,12 @@ class SimpleAIProviderManager:
                         "safety" in error_str
                     )
                     
-                    # For content filter errors, retry with deepseek-v3 (no safety filter)
+                    # For content filter errors, retry primary model without tools first,
+                    # then fall back to deepseek as last resort
                     if is_content_filter and provider_name == "openai_compatible":
-                        logger.warning(f"{provider_name} content filter triggered. "
-                                       f"Retrying with deepseek-v3 (no safety filter)...")
-                        try:
-                            retry_result = await asyncio.to_thread(
-                                self.openai_compat_api.generate_text,
-                                messages=messages,
-                                model="deepseek-v3",  # Use uncensored model
-                                temperature=temperature,
-                                max_tokens=max_tokens,
-                                tools=None,  # deepseek doesn't support tools well anyway
-                                tool_choice="none",
-                                **api_kwargs,
-                            )
-                            if "error" not in retry_result:
-                                logger.info(f"Retry with deepseek-v3 succeeded")
-                                self.stats["successful_requests"] += 1
-                                self.stats["provider_usage"][provider_name] += 1
-                                # Note: Tools won't work but at least we get a response
-                                return retry_result
-                        except Exception as retry_e:
-                            logger.warning(f"Retry with deepseek-v3 failed: {retry_e}")
-                            
-                        # If deepseek also fails, try without tools as last resort
+                        # Step 1: retry same model without tools (tools schema can trigger filters)
                         if tools:
-                            logger.warning(f"Trying original model without tools...")
+                            logger.warning(f"{provider_name} content filter triggered. Retrying without tools...")
                             try:
                                 retry_result = await asyncio.to_thread(
                                     self.openai_compat_api.generate_text,
@@ -419,7 +398,28 @@ class SimpleAIProviderManager:
                                     return retry_result
                             except Exception as retry_e:
                                 logger.warning(f"Retry without tools failed: {retry_e}")
-                    
+
+                        # Step 2: last resort — deepseek (no safety filter, no tools)
+                        logger.warning(f"Falling back to deepseek-v3 (no safety filter)...")
+                        try:
+                            retry_result = await asyncio.to_thread(
+                                self.openai_compat_api.generate_text,
+                                messages=messages,
+                                model="deepseek-v3",
+                                temperature=temperature,
+                                max_tokens=max_tokens,
+                                tools=None,
+                                tool_choice="none",
+                                **api_kwargs,
+                            )
+                            if "error" not in retry_result:
+                                logger.info(f"Retry with deepseek-v3 succeeded")
+                                self.stats["successful_requests"] += 1
+                                self.stats["provider_usage"][provider_name] += 1
+                                return retry_result
+                        except Exception as retry_e:
+                            logger.warning(f"Retry with deepseek-v3 failed: {retry_e}")
+
                     # Don't fallback on other unrecoverable errors (HTTP 400, content issues)
                     # These are validation/content errors that won't be fixed by switching providers
                     is_unrecoverable = is_marked_unrecoverable or (

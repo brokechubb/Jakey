@@ -39,12 +39,19 @@ class MCPMemoryServer:
 
     def __init__(self, port=None):
         self.app = web.Application()
-        self.memories: Dict[str, List[Dict[str, Any]]] = {}  # user_id -> memories
         self.port = port or get_available_port()
         self.auth_token = self._generate_auth_token()
         self.token_file = os.path.join(os.path.dirname(__file__), "..", ".mcp_token")
+        self._db = None
         self.setup_routes()
         self.setup_middleware()
+
+    def _get_db(self):
+        """Lazily import and return the database manager"""
+        if self._db is None:
+            from data.database import db
+            self._db = db
+        return self._db
 
     def _generate_auth_token(self) -> str:
         """Generate a cryptographically secure authentication token"""
@@ -127,30 +134,18 @@ class MCPMemoryServer:
             user_id = data["user_id"]
             information_type = data["information_type"]
             information = data["information"]
+            memory_id = str(uuid.uuid4())
 
-            # Create memory object
-            memory = {
-                "id": str(uuid.uuid4()),
-                "user_id": user_id,
-                "information_type": information_type,
-                "information": information,
-                "timestamp": datetime.utcnow().isoformat(),
-                "created_at": datetime.utcnow().isoformat(),
-            }
-
-            # Store memory
-            if user_id not in self.memories:
-                self.memories[user_id] = []
-
-            self.memories[user_id].append(memory)
+            db = self._get_db()
+            db.add_memory(user_id, information_type, information)
 
             logger.info(f"Stored memory for user {user_id}: {information_type}")
 
             return web.json_response(
                 {
                     "status": "success",
-                    "memory_id": memory["id"],
-                    "timestamp": memory["timestamp"],
+                    "memory_id": memory_id,
+                    "timestamp": datetime.utcnow().isoformat(),
                 }
             )
 
@@ -171,15 +166,22 @@ class MCPMemoryServer:
 
             limit = int(request.query.get("limit", 10))
 
-            user_memories = self.memories.get(user_id, [])
+            db = self._get_db()
+            raw = db.get_memories(user_id)
 
-            # Sort by timestamp (newest first) and limit
-            sorted_memories = sorted(
-                user_memories, key=lambda x: x["timestamp"], reverse=True
-            )[:limit]
+            memories = [
+                {
+                    "id": f"{user_id}:{k}",
+                    "user_id": user_id,
+                    "information_type": k,
+                    "information": v,
+                    "timestamp": datetime.utcnow().isoformat(),
+                }
+                for k, v in list(raw.items())[:limit]
+            ]
 
             return web.json_response(
-                {"memories": sorted_memories, "total": len(sorted_memories)}
+                {"memories": memories, "total": len(memories)}
             )
 
         except Exception as e:
@@ -197,29 +199,26 @@ class MCPMemoryServer:
 
             query = request.query.get("query", "").lower()
 
-            user_memories = self.memories.get(user_id, [])
+            db = self._get_db()
+            raw = db.get_memories(user_id)
 
-            # Filter memories based on query
-            if query:
-                filtered_memories = []
-                for memory in user_memories:
-                    # Search in information_type and information fields
-                    if (
-                        query in memory.get("information_type", "").lower()
-                        or query in memory.get("information", "").lower()
-                    ):
-                        filtered_memories.append(memory)
-                user_memories = filtered_memories
-
-            # Sort by timestamp (newest first)
-            sorted_memories = sorted(
-                user_memories, key=lambda x: x["timestamp"], reverse=True
-            )
+            memories = []
+            for k, v in raw.items():
+                if not query or query in k.lower() or query in v.lower():
+                    memories.append(
+                        {
+                            "id": f"{user_id}:{k}",
+                            "user_id": user_id,
+                            "information_type": k,
+                            "information": v,
+                            "timestamp": datetime.utcnow().isoformat(),
+                        }
+                    )
 
             return web.json_response(
                 {
-                    "memories": sorted_memories,
-                    "total": len(sorted_memories),
+                    "memories": memories,
+                    "total": len(memories),
                     "query": query,
                 }
             )
@@ -238,29 +237,19 @@ class MCPMemoryServer:
                 )
 
             memory_type = request.query.get("type")
+            db = self._get_db()
 
-            if user_id in self.memories:
-                if memory_type:
-                    # Delete memories of specific type
-                    original_count = len(self.memories[user_id])
-                    self.memories[user_id] = [
-                        m
-                        for m in self.memories[user_id]
-                        if m.get("information_type") != memory_type
-                    ]
-                    deleted_count = original_count - len(self.memories[user_id])
-                else:
-                    # Delete all memories for user
-                    deleted_count = len(self.memories[user_id])
-                    del self.memories[user_id]
-
-                logger.info(f"Deleted {deleted_count} memories for user {user_id}")
-
-                return web.json_response(
-                    {"status": "success", "deleted_count": deleted_count}
-                )
+            if memory_type:
+                deleted = db.delete_memory(user_id, memory_type)
+                deleted_count = 1 if deleted else 0
             else:
-                return web.json_response({"status": "success", "deleted_count": 0})
+                deleted_count = db.delete_memories(user_id)
+
+            logger.info(f"Deleted {deleted_count} memories for user {user_id}")
+
+            return web.json_response(
+                {"status": "success", "deleted_count": deleted_count}
+            )
 
         except Exception as e:
             logger.error(f"Error deleting memories: {e}")

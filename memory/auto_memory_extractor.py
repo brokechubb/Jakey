@@ -90,34 +90,29 @@ class AutoMemoryExtractor:
         Returns a list of memory objects to be stored.
         """
         memories = []
-        
-        # Combine user message and bot response for context
-        full_context = f"{user_message} {bot_response}"
-        
+
+        # Only analyse the user's own message — the bot response contains Jakey's
+        # words, not facts about the user, and scanning it produces noise.
+        user_text = user_message
+
         # Extract personal information
-        personal_memories = self._extract_personal_info(user_message, user_id)
+        personal_memories = self._extract_personal_info(user_text, user_id)
         memories.extend(personal_memories)
-        
+
         # Extract important facts
-        fact_memories = self._extract_important_facts(full_context, user_id)
+        fact_memories = self._extract_important_facts(user_text, user_id)
         memories.extend(fact_memories)
-        
+
         # Extract preferences and opinions
-        preference_memories = self._extract_preferences(full_context, user_id)
+        preference_memories = self._extract_preferences(user_text, user_id)
         memories.extend(preference_memories)
-        
-        # Extract context about what user is doing
-        context_memories = self._extract_context(full_context, user_id)
-        memories.extend(context_memories)
-        
+
         # Extract relationships
-        relationship_memories = self._extract_relationships(full_context, user_id)
+        relationship_memories = self._extract_relationships(user_text, user_id)
         memories.extend(relationship_memories)
         
         # Filter out memories that are too short or not meaningful
         filtered_memories = self._filter_memories(memories)
-        
-        # Generate unique IDs and timestamps
         for memory in filtered_memories:
             memory['id'] = self._generate_memory_id(memory, user_id)
             memory['timestamp'] = datetime.datetime.utcnow().isoformat()
@@ -323,10 +318,9 @@ class AutoMemoryExtractor:
             
             for memory in memories:
                 try:
-                    # Create a unique memory key from type, category, and timestamp/hash
-                    import hashlib
-                    import time
-                    # Create a short hash from the information content to ensure uniqueness
+                    # Key is derived from type+category+content hash so the same
+                    # fact always maps to the same key and upserts instead of
+                    # creating a new row on every extraction.
                     content_hash = hashlib.md5(memory.get("information", "").encode()).hexdigest()[:8]
                     memory_key = f"{memory['type']}_{memory['category']}_{content_hash}"
                     

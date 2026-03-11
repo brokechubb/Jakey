@@ -98,7 +98,7 @@ MULTIPLE_NEWLINES_PATTERN = re.compile(r"\n\s*\n\s*\n")
 
 def extract_text_tool_calls(ai_response: str) -> Tuple[List[Dict], str]:
     """
-    Extract tool calls from AI response text when model returns them as JSON instead of API format.
+    Extract ALL tool calls from AI response text when model returns them as JSON instead of API format.
 
     Args:
         ai_response: The AI response text to check for embedded tool calls
@@ -119,143 +119,172 @@ def extract_text_tool_calls(ai_response: str) -> Tuple[List[Dict], str]:
     except Exception:
         pass  # If we can't get tool names, skip validation
 
-    # Try JSON format first
-    match = TOOL_CALL_JSON_PATTERN.search(ai_response)
-    if match:
-        try:
-            function_name = match.group(1)
-            parameters_str = match.group(2)
-            parameters = json.loads(parameters_str)
+    # Collect ALL tool calls found in the response
+    all_tool_calls = []
+    cleaned_response = ai_response
 
-            # Validate that function name exists in available tools
-            if function_name not in valid_tool_names:
-                logging.getLogger(__name__).debug(
-                    f"Extracted function '{function_name}' not in valid tools, ignoring"
-                )
-                return [], ai_response
-
-            tool_calls = [
-                {
-                    "id": f"manual_{int(time.time())}",
-                    "type": "function",
-                    "function": {"name": function_name, "arguments": parameters},
-                }
-            ]
-
-            # Remove JSON from response
-            cleaned_response = TOOL_CALL_JSON_PATTERN.sub("", ai_response).strip()
-
-            return tool_calls, cleaned_response
-
-        except json.JSONDecodeError as e:
-            logging.getLogger(__name__).debug(f"Failed to parse tool call JSON: {e}")
-
-    # Try URL query string format (e.g., web_search?q=...)
-    match = URL_QUERY_PATTERN.search(ai_response)
-    if match:
-        try:
-            function_name = match.group(1)
-            query_string = match.group(2)
-
-            # Validate that function name exists in available tools
-            if function_name not in valid_tool_names:
-                logging.getLogger(__name__).debug(
-                    f"Extracted function '{function_name}' not in valid tools, ignoring"
-                )
-                return [], ai_response
-
-            # Parse query string to parameters
-            from urllib.parse import parse_qs
-
-            params = parse_qs(query_string)
-            # Handle single values (parse_qs returns lists)
-            parameters = {k: v[0] if len(v) == 1 else v for k, v in params.items()}
-
-            # Map common URL query parameter names to tool parameter names
-            param_mappings = {
-                "q": "query",
-                "search": "query",
-                "kw": "keyword",
-            }
-
-            # Apply parameter name mappings
-            mapped_parameters = {}
-            for k, v in parameters.items():
-                mapped_key = param_mappings.get(k, k)
-                mapped_parameters[mapped_key] = v
-
-            tool_calls = [
-                {
-                    "id": f"manual_{int(time.time())}",
-                    "type": "function",
-                    "function": {"name": function_name, "arguments": mapped_parameters},
-                }
-            ]
-
-            # Remove URL query from response
-            cleaned_response = URL_QUERY_PATTERN.sub("", ai_response).strip()
-
-            return tool_calls, cleaned_response
-
-        except Exception as e:
-            logging.getLogger(__name__).debug(
-                f"Failed to parse URL query tool call: {e}"
-            )
-
-    # Try Python function call format (e.g., play_trivia(channel_id=123))
-    match = PYTHON_CALL_PATTERN.search(ai_response)
-    if match:
-        try:
-            full_match = match.group(0)
-            parts = full_match.split("(", 1)
-            if len(parts) == 2:
-                function_name = parts[0].strip()
-                params_str = parts[1].rstrip(")")
+    # Try JSON format - extract ALL matches using findall
+    json_matches = TOOL_CALL_JSON_PATTERN.findall(ai_response)
+    if json_matches:
+        for match in json_matches:
+            try:
+                function_name = match[0]
+                parameters_str = match[1]
+                parameters = json.loads(parameters_str)
 
                 # Validate that function name exists in available tools
                 if function_name not in valid_tool_names:
                     logging.getLogger(__name__).debug(
                         f"Extracted function '{function_name}' not in valid tools, ignoring"
                     )
-                    return [], ai_response
+                    continue
 
-                # Parse parameters (key=value format, comma-separated)
-                parameters = {}
-                if params_str:
-                    import re
+                tool_call = {
+                    "id": f"manual_{int(time.time())}_{len(all_tool_calls)}",
+                    "type": "function",
+                    "function": {"name": function_name, "arguments": parameters},
+                }
+                all_tool_calls.append(tool_call)
+            except (json.JSONDecodeError, IndexError) as e:
+                logging.getLogger(__name__).debug(f"Failed to parse tool call JSON: {e}")
+                continue
 
-                    param_pairs = re.findall(
-                        r'(\w+)=["\']?([^"\'\)]+)["\']?', params_str
+        # Remove ALL JSON tool calls from response
+        cleaned_response = TOOL_CALL_JSON_PATTERN.sub("", cleaned_response).strip()
+
+        # If we found any JSON tool calls, return them
+        if all_tool_calls:
+            return all_tool_calls, cleaned_response
+
+    # Try URL query string format (e.g., web_search?q=...) - extract ALL matches
+    url_matches = list(URL_QUERY_PATTERN.finditer(ai_response))
+    if url_matches:
+        for match in url_matches:
+            try:
+                function_name = match.group(1)
+                query_string = match.group(2)
+
+                # Validate that function name exists in available tools
+                if function_name not in valid_tool_names:
+                    logging.getLogger(__name__).debug(
+                        f"Extracted function '{function_name}' not in valid tools, ignoring"
                     )
-                    for key, value in param_pairs:
-                        # Try to convert to int or float if possible
-                        try:
-                            if "." in value:
-                                value = float(value)
-                            else:
-                                value = int(value)
-                        except ValueError:
-                            pass  # Keep as string
-                        parameters[key] = value
+                    continue
 
-                tool_calls = [
-                    {
-                        "id": f"manual_{int(time.time())}",
+                # Parse query string to parameters
+                from urllib.parse import parse_qs
+
+                params = parse_qs(query_string)
+                # Handle single values (parse_qs returns lists)
+                parameters = {k: v[0] if len(v) == 1 else v for k, v in params.items()}
+
+                # Map common URL query parameter names to tool parameter names
+                param_mappings = {
+                    "q": "query",
+                    "search": "query",
+                    "kw": "keyword",
+                }
+
+                # Apply parameter name mappings
+                mapped_parameters = {}
+                for k, v in parameters.items():
+                    mapped_key = param_mappings.get(k, k)
+                    mapped_parameters[mapped_key] = v
+
+                tool_call = {
+                    "id": f"manual_{int(time.time())}_{len(all_tool_calls)}",
+                    "type": "function",
+                    "function": {"name": function_name, "arguments": mapped_parameters},
+                }
+                all_tool_calls.append(tool_call)
+            except Exception as e:
+                logging.getLogger(__name__).debug(
+                    f"Failed to parse URL query tool call: {e}"
+                )
+                continue
+
+        # Remove ALL URL query tool calls from response
+        cleaned_response = URL_QUERY_PATTERN.sub("", cleaned_response).strip()
+
+        # If we found any URL query tool calls, return them
+        if all_tool_calls:
+            return all_tool_calls, cleaned_response
+
+    # Try Python function call format (e.g., play_trivia(channel_id=123)) - extract ALL matches
+    python_matches = list(PYTHON_CALL_PATTERN.finditer(ai_response))
+    if python_matches:
+        for match in python_matches:
+            try:
+                full_match = match.group(0)
+                parts = full_match.split("(", 1)
+                if len(parts) == 2:
+                    function_name = parts[0].strip()
+                    params_str = parts[1].rstrip(")")
+
+                    # Validate that function name exists in available tools
+                    if function_name not in valid_tool_names:
+                        logging.getLogger(__name__).debug(
+                            f"Extracted function '{function_name}' not in valid tools, ignoring"
+                        )
+                        continue
+
+                    # Parse parameters (key=value format, comma-separated)
+                    parameters = {}
+                    if params_str:
+                        import re
+
+                        # First try key=value pairs
+                        param_pairs = re.findall(
+                            r'(\w+)=["\']?([^"\',\)]+)["\']?', params_str
+                        )
+                        for key, value in param_pairs:
+                            try:
+                                if "." in value:
+                                    parameters[key] = float(value)
+                                else:
+                                    parameters[key] = int(value)
+                            except ValueError:
+                                parameters[key] = value.strip()
+
+                        # If no key=value pairs found, treat first quoted/unquoted string
+                        # as a positional arg and map it to the tool's first required param
+                        if not parameters:
+                            positional = re.search(r'''["\']([^"\']+)["\']|^([^,\)]+)''', params_str.strip())
+                            if positional:
+                                value = (positional.group(1) or positional.group(2) or "").strip()
+                                if value and function_name in valid_tool_names:
+                                    # Look up first required param from tool schema
+                                    try:
+                                        tool_def = next(
+                                            t for t in tool_manager.get_available_tools()
+                                            if t["function"]["name"] == function_name
+                                        )
+                                        required = tool_def["function"].get("parameters", {}).get("required", [])
+                                        if required:
+                                            parameters[required[0]] = value
+                                    except (StopIteration, KeyError):
+                                        parameters["query"] = value  # safe default
+
+                    tool_call = {
+                        "id": f"manual_{int(time.time())}_{len(all_tool_calls)}",
                         "type": "function",
                         "function": {"name": function_name, "arguments": parameters},
                     }
-                ]
+                    all_tool_calls.append(tool_call)
+            except Exception as e:
+                logging.getLogger(__name__).debug(
+                    f"Failed to parse Python function call: {e}"
+                )
+                continue
 
-                # Remove function call from response
-                cleaned_response = PYTHON_CALL_PATTERN.sub("", ai_response).strip()
+        # Remove ALL function calls from response
+        cleaned_response = PYTHON_CALL_PATTERN.sub("", cleaned_response).strip()
 
-                return tool_calls, cleaned_response
+        # If we found any Python function tool calls, return them
+        if all_tool_calls:
+            return all_tool_calls, cleaned_response
 
-        except Exception as e:
-            logging.getLogger(__name__).debug(
-                f"Failed to parse Python function call: {e}"
-            )
-
+    # No tool calls found
     return [], ai_response
 
 
@@ -1643,8 +1672,18 @@ class JakeyBot(commands.Bot):
                         ]
                     )
                     system_content += (
-                        f"\n\nYOUR RECENT RESPONSES TO THIS USER (DO NOT REPEAT THESE - use different openings, structure, and phrasing):\n"
+                        f"\n\nYOUR RECENT RESPONSES TO THIS USER (DO NOT REPEAT THESE - "
+                        f"avoid the same ideas, angles, and themes, not just the same words):\n"
                         f"{recent_text}"
+                    )
+
+                # Inject repeated phrases as an explicit avoid list
+                repeated_phrases = self._response_uniqueness.get_repeated_phrases(str(message.author.id))
+                if repeated_phrases:
+                    phrases_text = "\n".join(f"- \"{p}\"" for p in repeated_phrases)
+                    system_content += (
+                        f"\n\nPHRASES YOU HAVE OVERUSED RECENTLY (do NOT use these again):\n"
+                        f"{phrases_text}"
                     )
 
             if memory_context:
@@ -1833,7 +1872,7 @@ class JakeyBot(commands.Bot):
                     )
                     if extracted_calls:
                         logger.warning(
-                            "⚠️ Model returned tool call as TEXT instead of using proper API format!"
+                            f"⚠️ Model returned {len(extracted_calls)} tool call(s) as TEXT instead of using proper API format: {[tc.get('function', {}).get('name', 'unknown') for tc in extracted_calls]}"
                         )
                         tool_calls = extracted_calls
                         ai_response = cleaned_response
@@ -2157,9 +2196,21 @@ class JakeyBot(commands.Bot):
                     )
                     ai_response += "\n\n*(I had to stop because I was doing too many things at once)*"
             else:
-                ai_response = response.get("content", "").strip()
+                # Try to extract content from non-standard response formats
+                ai_response = ""
+                if isinstance(response, dict):
+                    # Try common alternate keys
+                    for key in ("content", "body", "msg", "text", "message"):
+                        val = response.get(key)
+                        if isinstance(val, str) and val.strip():
+                            ai_response = val.strip()
+                            break
+                        elif isinstance(val, dict) and val.get("content"):
+                            ai_response = str(val["content"]).strip()
+                            break
                 logger.warning(
-                    f"Response had no 'choices' key. Response keys: {response.keys()}"
+                    f"Response had no 'choices' key. Response keys: {list(response.keys()) if isinstance(response, dict) else type(response)}. "
+                    f"Extracted content: {bool(ai_response)}"
                 )
 
             if not ai_response:
@@ -2416,18 +2467,15 @@ class JakeyBot(commands.Bot):
                 ]
 
                 if filtered_memories:
-                    # Store the extracted memories
                     results = await extractor.store_memories(filtered_memories, user_id)
                     successful = sum(1 for result in results if result)
 
                     if successful > 0:
-                        logger.debug(
-                            f"Successfully stored {successful}/{len(filtered_memories)} auto-extracted memories"
+                        logger.info(
+                            f"Auto-memory: stored {successful}/{len(filtered_memories)} memories for user {user_id}"
                         )
-                    else:
-                        logger.debug("Failed to store any auto-extracted memories")
                 else:
-                    logger.debug("No memories met confidence threshold")
+                    logger.debug("Auto-memory: no memories met confidence threshold")
 
         except ImportError as e:
             logger.warning(f"Auto memory extractor not available: {e}")
@@ -3378,6 +3426,22 @@ class JakeyBot(commands.Bot):
         # Check if this server is configured for welcome messages
         if str(member.guild.id) not in WELCOME_SERVER_IDS:
             return
+
+        # CRITICAL: Prevent welcome messages to existing members on reconnection
+        # Discord sends on_member_join events for existing members when:
+        # - Bot reconnects after disconnect
+        # - Member chunking happens
+        # - Cache is invalidated
+        # Only send welcome if member joined within the last 60 seconds
+        if member.joined_at:
+            import datetime
+            time_since_join = (datetime.datetime.now(datetime.timezone.utc) - member.joined_at).total_seconds()
+            if time_since_join > 60:
+                logger.debug(
+                    f"Skipping welcome for {member.name} - joined {time_since_join:.0f}s ago (not a new join)"
+                )
+                return
+            logger.debug(f"Member {member.name} joined {time_since_join:.1f}s ago - sending welcome")
 
         # Find a suitable channel to send the welcome message
         welcome_channel = None
@@ -5829,8 +5893,8 @@ class JakeyBot(commands.Bot):
                                 f"Channel {channel_id}: elapsed {elapsed:.1f}s, game: {game}"
                             )
 
-                            # Game expires after 60 seconds regardless of attempts
-                            if elapsed > 60:
+                            # Game expires after 30 seconds regardless of attempts
+                            if elapsed > 30:
                                 games_to_end.append((channel_id, game))
                                 logger.info(
                                     f"Trivia game timeout detected for channel {channel_id}"

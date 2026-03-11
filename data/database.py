@@ -71,9 +71,22 @@ class DatabaseManager:
                 value TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users (user_id)
+                FOREIGN KEY (user_id) REFERENCES users (user_id),
+                UNIQUE(user_id, key)
             )
         """)
+
+        # Migration: add UNIQUE constraint to existing memories table if missing
+        cursor.execute("PRAGMA index_list(memories)")
+        existing_indexes = [row[1] for row in cursor.fetchall()]
+        if "memories_user_key_unique" not in existing_indexes:
+            try:
+                cursor.execute("""
+                    CREATE UNIQUE INDEX IF NOT EXISTS memories_user_key_unique
+                    ON memories(user_id, key)
+                """)
+            except Exception:
+                pass  # Index may already exist under a different name
 
         # Add performance indexes
         cursor.execute(
@@ -376,14 +389,17 @@ class DatabaseManager:
         return [{"messages": json.loads(row[0]), "timestamp": row[1]} for row in rows]
 
     def add_memory(self, user_id: str, key: str, value: str):
-        """Add a memory entry for a user"""
+        """Add or update a memory entry for a user (upserts on user_id+key)"""
         conn = self._get_connection()
         cursor = conn.cursor()
 
         cursor.execute(
             """
-            INSERT INTO memories (user_id, key, value)
-            VALUES (?, ?, ?)
+            INSERT INTO memories (user_id, key, value, created_at, updated_at)
+            VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            ON CONFLICT(user_id, key) DO UPDATE SET
+                value = excluded.value,
+                updated_at = CURRENT_TIMESTAMP
         """,
             (user_id, key, value),
         )
@@ -431,6 +447,21 @@ class DatabaseManager:
         conn.close()
 
         return count
+
+    def delete_memory(self, user_id: str, key: str) -> bool:
+        """Delete a specific memory entry for a user by key"""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute(
+            "DELETE FROM memories WHERE user_id = ? AND key = ?", (user_id, key)
+        )
+        deleted = cursor.rowcount > 0
+
+        conn.commit()
+        conn.close()
+
+        return deleted
 
     def delete_old_memories(self, user_id: str, cutoff_date: str) -> int:
         """Delete memories for a user older than a cutoff date and return the count of deleted memories.
@@ -632,6 +663,11 @@ class DatabaseManager:
         """Async version of delete_memories"""
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(self._executor, self.delete_memories, user_id)
+
+    async def adelete_memory(self, user_id: str, key: str) -> bool:
+        """Async version of delete_memory"""
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(self._executor, self.delete_memory, user_id, key)
 
     async def adelete_old_memories(self, user_id: str, cutoff_date: str) -> int:
         """Async version of delete_old_memories"""

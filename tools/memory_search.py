@@ -255,22 +255,15 @@ class MemorySearchTool:
         
         if 'relationship' in grouped and grouped['relationship']:
             formatted_parts.append("Relationships:")
-            for memory in grouped['relationship'][:3]:  # Limit to 3 items
-                formatted_parts.append(f"  - {memory['information']}")
-        
-        if 'context' in grouped and grouped['context']:
-            formatted_parts.append("Recent Context:")
-            for memory in grouped['context'][:3]:  # Limit to 3 items
+            for memory in grouped['relationship'][:3]:
                 formatted_parts.append(f"  - {memory['information']}")
         
         return '\n'.join(formatted_parts) if formatted_parts else "No relevant memories found."
 
     def _get_cache_key(self, user_id: str, query: str) -> str:
-        """Generate cache key for memory searches."""
-        # Use first 50 chars of query to create more specific cache keys
-        # This prevents collisions between similar but different queries
-        query_preview = query[:50].lower() if query else ""
-        return f"{user_id}:{hash(query_preview)}:{len(query)}"
+        """Generate cache key per user — memories don't change between messages
+        within the TTL window, so keying on user_id gives a real hit rate."""
+        return user_id
     
     def _get_from_cache(self, cache_key: str) -> Optional[str]:
         """Get result from cache if valid."""
@@ -356,49 +349,31 @@ class MemorySearchTool:
             search_result = await self.search_user_memories(user_id, message_content, limit)
             
             # If full message search doesn't find enough memories, try keywords
-            # BUT only if we have keywords and the first search was poor
-            if (not search_result.get('success') or 
-                search_result.get('total_memories', 0) < 2) and keywords:
-                
-                # Use keywords as fallback query
-                keyword_query = ' '.join(keywords[:5])  # Use top 5 keywords
+            if (not search_result.get('success') or
+                    search_result.get('total_memories', 0) < 2) and keywords:
+                keyword_query = ' '.join(keywords[:5])
                 keyword_search = await self.search_user_memories(user_id, keyword_query, limit)
-                
-                # Use keyword search only if it finds more memories
-                if (keyword_search.get('success') and 
-                    keyword_search.get('total_memories', 0) > search_result.get('total_memories', 0)):
+                if (keyword_search.get('success') and
+                        keyword_search.get('total_memories', 0) > search_result.get('total_memories', 0)):
                     search_result = keyword_search
-            
-            # If still no good results, get recent memories (final fallback)
+
+            # Only inject memories that are actually relevant to this message.
+            # No fallback dump of recent memories — irrelevant context adds noise.
             if not search_result.get('success') or search_result.get('total_memories', 0) == 0:
-                recent_search = await self.search_user_memories(user_id, None, limit)
-                if recent_search.get('success'):
-                    search_result = recent_search
+                self._store_in_cache(cache_key, "")
+                return ""
             
-            # Format the memories for AI consumption
+            # Format and cache the result
             if search_result and search_result.get('success'):
                 formatted_memories = self.format_memories_for_ai(search_result)
-                
-                # Store in cache for future requests
                 self._store_in_cache(cache_key, formatted_memories)
-                
-                # Log performance metrics
                 search_time = time.time() - start_time
                 self.logger.info(
                     f"Memory context retrieved in {search_time:.3f}s: "
                     f"{search_result.get('total_memories', 0)} memories for user {user_id}"
                 )
-                
                 return formatted_memories
-            
-            # DON'T cache empty results - they prevent retries when memories exist
-            # Empty results can occur due to transient failures or cache issues
-            # Not caching empty results ensures the next search will try again
-            
-            # Log performance even for empty results
-            search_time = time.time() - start_time
-            self.logger.warning(f"Memory context search completed in {search_time:.3f}s: no memories found for user {user_id} (query: {message_content[:50]}...)")
-            
+
             return ""
             
         except Exception as e:

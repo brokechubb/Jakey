@@ -462,25 +462,39 @@ class TriviaDatabase:
         )
 
     async def get_questions_by_category(
-        self, category_name: str, limit: int = 100
+        self, category_name: str, limit: int = 100, exclude_ids: Optional[List[int]] = None
     ) -> List[Dict]:
-        """Get questions for a specific category"""
+        """Get questions for a specific category, randomly ordered to avoid repeats"""
 
         def _get_questions():
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
-            cursor.execute(
+            if exclude_ids:
+                placeholders = ",".join("?" * len(exclude_ids))
+                query = f"""
+                    SELECT q.id, q.question_text, q.answer_text, q.difficulty,
+                           q.times_asked, q.times_correct, q.created_at
+                    FROM trivia_questions q
+                    JOIN trivia_categories c ON q.category_id = c.id
+                    WHERE c.name = ? AND q.is_active = 1
+                    AND q.id NOT IN ({placeholders})
+                    ORDER BY q.times_asked ASC, RANDOM()
+                    LIMIT ?
                 """
-                SELECT q.id, q.question_text, q.answer_text, q.difficulty,
-                       q.times_asked, q.times_correct, q.created_at
-                FROM trivia_questions q
-                JOIN trivia_categories c ON q.category_id = c.id
-                WHERE c.name = ? AND q.is_active = 1
-                ORDER BY q.created_at DESC
-                LIMIT ?
-            """,
-                (category_name, limit),
-            )
+                cursor.execute(query, (category_name, *exclude_ids, limit))
+            else:
+                cursor.execute(
+                    """
+                    SELECT q.id, q.question_text, q.answer_text, q.difficulty,
+                           q.times_asked, q.times_correct, q.created_at
+                    FROM trivia_questions q
+                    JOIN trivia_categories c ON q.category_id = c.id
+                    WHERE c.name = ? AND q.is_active = 1
+                    ORDER BY q.times_asked ASC, RANDOM()
+                    LIMIT ?
+                """,
+                    (category_name, limit),
+                )
             results = cursor.fetchall()
             conn.close()
 

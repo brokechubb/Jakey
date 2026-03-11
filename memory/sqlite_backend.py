@@ -82,15 +82,12 @@ class SQLiteMemoryBackend(MemoryBackend):
         """Delete memory entries from SQLite"""
         try:
             if key:
-                # Delete specific memory key (not currently implemented in database)
-                # For now, delete all memories for the user
-                logger.warning(f"SQLite backend does not support deleting specific keys. Deleting all memories for user {user_id}")
-                await self.db.adelete_memories(user_id)
+                deleted = await self.db.adelete_memory(user_id, key)
+                return deleted
             else:
-                # Delete all memories for the user
                 deleted_count = await self.db.adelete_memories(user_id)
                 logger.info(f"Deleted {deleted_count} memories for user {user_id}")
-            return True
+                return True
         except Exception as e:
             logger.error(f"SQLite memory deletion failed: {e}")
             return False

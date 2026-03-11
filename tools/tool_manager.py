@@ -44,12 +44,7 @@ class ToolManager:
         self._in_dm_context = False
         self._dm_channel_id = None
 
-    def _check_dm_restriction(self, tool_name: str) -> Optional[str]:
-        """Check if tool is restricted in DM context"""
-        if self._in_dm_context:
-            return f"❌ {tool_name} cannot be used in DMs. Please use this in a server channel."
-        return None
-
+        # Initialize tools dictionary
         self.tools = {
             "set_reminder": self.set_reminder,
             "list_reminders": self.list_reminders,
@@ -69,7 +64,7 @@ class ToolManager:
             "analyze_image": self.analyze_image,
             "calculate": self.calculate,
             "get_current_time": self.get_current_time,
-            "remember_user_mcp": self.remember_user_mcp,
+            "remember_user_mcp": self.remember_user_info,
             "generate_keno_numbers": self.generate_keno_numbers,
             # Trivia tools
             "play_trivia": self.play_trivia,
@@ -184,7 +179,6 @@ class ToolManager:
             "cancel_reminder": 1.0,  # 1 second between calls
             "check_due_reminders": 5.0,  # 5 seconds between calls (background task)
             "remember_user_info": 1.0,  # 1 second between calls
-            "remember_user_mcp": 1.0,  # 1 second between calls
             "search_user_memory": 0.1,  # 0.1 seconds between calls
             # Trivia tool rate limits
             "play_trivia": 3.0,  # 3 seconds between calls
@@ -212,6 +206,18 @@ class ToolManager:
         # Initialize trivia games dictionary to track active games
         # Maps channel_id to game state dictionary with question, category, start_time, attempts
         self._trivia_games = {}
+
+        # Track recently asked question IDs per channel to avoid repeats
+        # Maps channel_id -> deque of recent question IDs (last 50 per channel)
+        from collections import deque
+        self._trivia_recent: dict = {}
+        self._trivia_recent_max = 50  # How many recent questions to track per channel
+
+    def _check_dm_restriction(self, tool_name: str) -> Optional[str]:
+        """Check if tool is restricted in DM context"""
+        if self._in_dm_context:
+            return f"❌ {tool_name} cannot be used in DMs. Please use this in a server channel."
+        return None
 
     def _validate_crypto_symbol(self, symbol: str) -> bool:
         """Validate cryptocurrency symbol using security framework."""
@@ -675,31 +681,6 @@ class ToolManager:
                                 "default": "UTC",
                             }
                         },
-                    },
-                },
-            },
-            {
-                "type": "function",
-                "function": {
-                    "name": "remember_user_mcp",
-                    "description": "Remember user information using MCP memory server with enhanced capabilities",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "user_id": {
-                                "type": "string",
-                                "description": "Discord user ID",
-                            },
-                            "information_type": {
-                                "type": "string",
-                                "description": "Type of information (e.g. 'preference', 'fact', 'reminder')",
-                            },
-                            "information": {
-                                "type": "string",
-                                "description": "The information to remember",
-                            },
-                        },
-                        "required": ["user_id", "information_type", "information"],
                     },
                 },
             },
@@ -1205,7 +1186,7 @@ class ToolManager:
                 "type": "function",
                 "function": {
                     "name": "fattips_send_tip",
-                    "description": "Send a Solana token tip to another user using FatTips",
+                    "description": "Send a tip to ANOTHER user (single recipient only). USE THIS for individual tips like: 'tip user 0.1 SOL', 'send $5 to @user'. FOR RAINS WITH MULTIPLE WINNERS, USE fattips_create_rain INSTEAD.",
                     "parameters": {
                         "type": "object",
                         "properties": {
@@ -1365,7 +1346,7 @@ class ToolManager:
                 "type": "function",
                 "function": {
                     "name": "fattips_create_rain",
-                    "description": "Create a FatTips rain to specific winners (like trivia winners)",
+                    "description": "Create a rain for MULTIPLE winners (2+ users). Examples: community rains, tipping active chat participants. For trivia winners (1 person), USE fattips_send_tip INSTEAD.",
                     "parameters": {
                         "type": "object",
                         "properties": {
@@ -1590,119 +1571,11 @@ class ToolManager:
             )
 
         try:
-            # Check if unified memory backend is enabled (migration complete)
-            migration_flag = os.path.join(
-                os.path.dirname(os.path.dirname(__file__)), ".memory_migration_complete"
-            )
-            if os.path.exists(migration_flag):
-                try:
-                    # Dynamic import to avoid circular dependencies
-                    import importlib
-
-                    memory_module = importlib.import_module("memory")
-                    memory_backend = memory_module.memory_backend
-
-                    if memory_backend is not None:
-                        # Use unified memory backend
-                        import asyncio
-
-                        async def _store_memory():
-                            success = await memory_backend.store(
-                                user_id, information_type, information
-                            )
-                            return success
-
-                        # Run the async operation
-                        try:
-                            loop = asyncio.get_running_loop()
-                            import concurrent.futures
-
-                            with concurrent.futures.ThreadPoolExecutor() as executor:
-                                future = executor.submit(asyncio.run, _store_memory())
-                                success = future.result()
-                        except RuntimeError:
-                            success = asyncio.run(_store_memory())
-
-                        if success:
-                            return f"Got it! I'll remember that {information_type}: {information}"
-                        else:
-                            return (
-                                "Sorry, I couldn't remember that information right now."
-                            )
-                except (ImportError, AttributeError) as e:
-                    # Log but don't fail - fall back to legacy system
-                    import logging
-
-                    logging.getLogger(__name__).warning(
-                        f"Unified memory backend unavailable: {e}"
-                    )
-
-            # Fallback to direct database access (legacy system)
             from data.database import db
-
-            key = f"{information_type}"
-            db.add_memory(user_id, key, information)
-
+            db.add_memory(user_id, information_type, information)
             return f"Got it! I'll remember that {information_type}: {information}"
         except Exception as e:
             return f"Error remembering information: {str(e)}"
-
-        except Exception as e:
-            return f"Error remembering information: {str(e)}"
-
-    def remember_user_mcp(
-        self, user_id: str, information_type: str, information: str
-    ) -> str:
-        """Remember user information using MCP memory server with rate limiting and fallback"""
-        if not self._check_rate_limit("remember_user_mcp", user_id):
-            return (
-                "Rate limit exceeded. Please wait before remembering more information."
-            )
-
-        if not MCP_MEMORY_ENABLED:
-            # Fallback to SQLite when MCP is disabled
-            return self.remember_user_info(user_id, information_type, information)
-
-        try:
-            # Create the async function to run the operation
-            async def _run_with_context():
-                async with MCPMemoryClient() as client:
-                    if not await client.check_connection():
-                        return {"error": "MCP memory server not accessible"}
-                    return await client.remember_user_info(
-                        user_id, information_type, information
-                    )
-
-            # Check if there's already a running event loop
-            try:
-                loop = asyncio.get_running_loop()
-                # If there's a running loop, create a task and wait for it
-                import concurrent.futures
-
-                with concurrent.futures.ThreadPoolExecutor() as executor:
-                    future = executor.submit(asyncio.run, _run_with_context())
-                    result = future.result()
-            except RuntimeError:
-                # No running event loop, safe to run directly
-                result = asyncio.run(_run_with_context())
-
-            if "error" in result:
-                # Fallback to SQLite when MCP fails
-                fallback_result = self.remember_user_info(
-                    user_id, information_type, information
-                )
-                return f"MCP memory unavailable, using local storage: {fallback_result}"
-
-            return f"Got it! I'll remember that {information_type}: {information} (stored in MCP memory)"
-        except Exception as e:
-            # Fallback to SQLite when MCP fails
-            try:
-                fallback_result = self.remember_user_info(
-                    user_id, information_type, information
-                )
-                return f"MCP memory error ({str(e)}), using local storage: {fallback_result}"
-            except Exception as fallback_error:
-                return f"Both MCP and local storage failed: MCP: {str(e)}, Local: {str(fallback_error)}"
 
     def search_user_memory(self, user_id: str, query: str = "") -> str:
         """Search user memories with rate limiting - Uses SQLite as single source"""
@@ -3282,25 +3155,39 @@ class ToolManager:
                     difficulty = None
             # Import trivia manager
             import random
+            from collections import deque
 
             from data.trivia_database import trivia_db
 
             # Initialize if needed
             if not hasattr(self, "_trivia_games"):
                 self._trivia_games = {}  # channel_id -> game_state
+            if not hasattr(self, "_trivia_recent"):
+                self._trivia_recent = {}
+                self._trivia_recent_max = 50
 
             # Check if there's already an active game in this channel
             if channel_id in self._trivia_games:
                 active_game = self._trivia_games[channel_id]
                 elapsed = asyncio.get_event_loop().time() - active_game["start_time"]
-                if elapsed < 60:  # Game expires after 60 seconds
+                if elapsed < 30:  # Game expires after 30 seconds
                     return f"❌ There's already an active trivia game in this channel! Wait for it to finish."
+
+            # Get recently asked question IDs for this channel to exclude
+            recent_ids = list(self._trivia_recent.get(channel_id, deque()))
 
             # Get available categories if category not specified
             if category:
                 questions = await trivia_db.get_questions_by_category(
-                    category, limit=100
+                    category, limit=50, exclude_ids=recent_ids
                 )
+                if not questions:
+                    # All recent questions exhausted for this category, reset and retry
+                    if recent_ids:
+                        self._trivia_recent.pop(channel_id, None)
+                        questions = await trivia_db.get_questions_by_category(
+                            category, limit=50
+                        )
                 if not questions:
                     return f"❌ No trivia questions found for category: `{category}`. Try %triviacats to see available categories."
             else:
@@ -3319,8 +3206,15 @@ class ToolManager:
                 selected_category = random.choice(categories_with_questions)
                 category = selected_category["name"]
                 questions = await trivia_db.get_questions_by_category(
-                    category, limit=100
+                    category, limit=50, exclude_ids=recent_ids
                 )
+                if not questions:
+                    # Exhausted recent questions for this category, reset and retry
+                    if recent_ids:
+                        self._trivia_recent.pop(channel_id, None)
+                        questions = await trivia_db.get_questions_by_category(
+                            category, limit=50
+                        )
 
             # Filter by difficulty if specified
             if difficulty:
@@ -3330,8 +3224,13 @@ class ToolManager:
                 if not questions:
                     return f"❌ No questions found with difficulty level {difficulty} in category `{category}`."
 
-            # Select a random question
+            # Select a random question from the least-asked pool
             question = random.choice(questions)
+
+            # Track this question as recently asked to avoid future repeats
+            if channel_id not in self._trivia_recent:
+                self._trivia_recent[channel_id] = deque(maxlen=self._trivia_recent_max)
+            self._trivia_recent[channel_id].append(question["id"])
 
             # Store the active game
             start_time = asyncio.get_event_loop().time()
@@ -3359,7 +3258,7 @@ class ToolManager:
 **❓ Question:**
 {question["question_text"]}
 
-⏱️ You have 60 seconds to answer! Just type your answer in chat.
+⏱️ You have 30 seconds to answer! Just type your answer in chat.
 
 💡 *Hint: The answer has {len(question["answer_text"])} characters*"""
 
@@ -3708,7 +3607,7 @@ class ToolManager:
             return f"❌ Error listing airdrops: {str(e)}"
 
     async def fattips_create_rain(self, creator_id: str, amount: float, token: str, winners: list, amount_type: str = "token") -> str:
-        """Create a FatTips rain (trivia winners, etc.)
+        """Create a FatTips rain to multiple active users (community rains)
 
         Args:
             creator_id: Discord user ID creating the rain

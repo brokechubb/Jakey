@@ -428,6 +428,53 @@ class ResponseUniquenessManager:
             "recent_responses": list(user_responses)[-3:],  # Last 3 responses
         }
 
+    def get_repeated_phrases(self, user_id: str, min_length: int = 4, top_n: int = 8) -> List[str]:
+        """
+        Extract phrases that have appeared across multiple recent responses.
+        These are the punchlines and catchphrases the model is stuck on.
+        Returns the most-repeated phrases so they can be injected as an avoid list.
+        """
+        user_history = list(self.user_responses.get(user_id, []))
+        global_history = list(self.global_responses)[-10:]
+        all_recent = user_history[-8:] + global_history
+
+        if len(all_recent) < 2:
+            return []
+
+        # Count phrase occurrences across responses
+        phrase_seen_in: Dict[str, int] = {}
+
+        for response in all_recent:
+            words = self._clean_text(response).split()
+            seen_in_this = set()
+            for length in range(min_length, min(8, len(words)) + 1):
+                for i in range(len(words) - length + 1):
+                    phrase = " ".join(words[i:i + length])
+                    if len(phrase) < 15:  # too short to be meaningful
+                        continue
+                    if phrase not in seen_in_this:
+                        phrase_seen_in[phrase] = phrase_seen_in.get(phrase, 0) + 1
+                        seen_in_this.add(phrase)
+
+        # Phrases appearing in 2+ responses are recurring hooks
+        repeated = sorted(
+            [(p, c) for p, c in phrase_seen_in.items() if c >= 2],
+            key=lambda x: (x[1], len(x[0])),
+            reverse=True
+        )
+
+        # Deduplicate: skip phrases that are substrings of already-included ones
+        result = []
+        seen_content = []
+        for phrase, _ in repeated:
+            if not any(phrase in s for s in seen_content):
+                result.append(phrase)
+                seen_content.append(phrase)
+            if len(result) >= top_n:
+                break
+
+        return result
+
     def get_avoid_list(self, user_id: str, limit: int = 5) -> List[str]:
         """
         Get a list of recent response snippets to explicitly avoid.
