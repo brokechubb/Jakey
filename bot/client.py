@@ -801,6 +801,81 @@ class JakeyBot(commands.Bot):
         # Final hardcoded fallback (OpenRouter free models only)
         return model_lower in FALLBACK_MODELS
 
+    def _filter_tools_for_message(self, all_tools: list, message_content: str) -> list:
+        """
+        Return only the tools relevant to this message to reduce context size.
+        Always includes a core set; adds domain-specific tools based on keywords.
+        Reduces the 55-tool (~6500 token) payload to ~15-20 tools per request.
+        """
+        msg = message_content.lower()
+
+        # Core tools always included — needed for any response
+        ALWAYS_INCLUDE = {
+            "web_search", "get_current_time", "calculate",
+            "remember_user_info", "search_user_memory",
+        }
+
+        # Keyword → tool names to add
+        KEYWORD_TOOL_MAP = [
+            # Discord operations
+            (["channel", "server", "guild", "message", "post", "chat", "read", "search", "pin",
+              "who", "members", "roles", "kick", "ban", "timeout", "purge", "delete", "send",
+              "dm", "announce", "mod", "mute", "unban"],
+             {"discord_read_channel", "discord_search_messages", "discord_send_message",
+              "discord_send_dm", "discord_list_channels", "discord_list_guilds",
+              "discord_list_guild_members", "discord_get_user_roles", "discord_get_user_info",
+              "discord_kick_user", "discord_ban_user", "discord_unban_user",
+              "discord_timeout_user", "discord_remove_timeout",
+              "discord_purge_messages", "discord_delete_message",
+              "discord_pin_message", "discord_unpin_message"}),
+            # Crypto / prices
+            (["price", "crypto", "bitcoin", "btc", "eth", "sol", "coin", "token",
+              "stock", "market", "$", "worth", "value"],
+             {"get_crypto_price", "get_stock_price"}),
+            # Images
+            (["image", "picture", "photo", "draw", "generate", "create", "make", "show",
+              "look", "analyze", "what is this"],
+             {"generate_image", "analyze_image"}),
+            # Reminders
+            (["remind", "reminder", "alarm", "timer", "alert", "notify", "schedule"],
+             {"set_reminder", "list_reminders", "cancel_reminder", "check_due_reminders"}),
+            # Research
+            (["research", "company", "about", "crawl", "website", "url", "http"],
+             {"company_research", "crawling"}),
+            # FatTips
+            (["tip", "tips", "fattips", "fat tips", "rain", "airdrop", "wallet",
+              "balance", "sol", "usdc", "usdt", "withdraw", "swap", "deposit",
+              "crypto", "send", "transfer", "leaderboard"],
+             {"fattips_get_balance", "fattips_send_tip", "fattips_send_batch_tip",
+              "fattips_create_airdrop", "fattips_claim_airdrop", "fattips_list_airdrops",
+              "fattips_create_rain", "fattips_get_wallet", "fattips_create_wallet",
+              "fattips_get_transactions", "fattips_withdraw",
+              "fattips_get_swap_quote", "fattips_execute_swap", "fattips_get_leaderboard"}),
+            # Rate limits / admin
+            (["rate limit", "rate", "limit", "reset", "admin", "stats"],
+             {"get_user_rate_limit_status", "get_system_rate_limit_stats", "reset_user_rate_limits"}),
+            # Games
+            (["keno", "trivia", "game", "play", "question", "quiz", "gamble"],
+             {"generate_keno_numbers", "play_trivia"}),
+            # Legacy tip.cc
+            (["tip.cc", "tipcc", "bonus", "airdrop"],
+             {"tip_user", "check_balance", "get_bonus_schedule"}),
+        ]
+
+        wanted = set(ALWAYS_INCLUDE)
+        for keywords, tools in KEYWORD_TOOL_MAP:
+            if any(kw in msg for kw in keywords):
+                wanted.update(tools)
+
+        filtered = [t for t in all_tools if t["function"]["name"] in wanted]
+
+        # If almost everything matched anyway, just return all
+        if len(filtered) >= len(all_tools) - 5:
+            return all_tools
+
+        logger.debug(f"Tool filtering: {len(all_tools)} → {len(filtered)} tools for this message")
+        return filtered
+
     # Anti-Repetition Methods
     def _is_repetitive_response(
         self, response_text: str, user_id: str
@@ -1618,6 +1693,9 @@ class JakeyBot(commands.Bot):
             if not user_content:
                 return  # Don't respond to empty messages
 
+            # Detect name-only trigger — resolved after context is collected below
+            is_name_only_trigger = user_content.lower().strip().rstrip("!?,. ") == "jakey"
+
             # Get memory context for the user
             memory_context = ""
             try:
@@ -1716,11 +1794,33 @@ class JakeyBot(commands.Bot):
             # FORCE BREVITY: Add a final, unignorable instruction at the very end
             system_content += (
                 "\n\n🛑 **FINAL INSTRUCTION:** "
-                "You are currently in 'Short Mode'. "
-                "Your response MUST be under 100 words. "
-                "Do NOT write more than 4 sentences. "
-                "If you write a paragraph, you have FAILED."
+                "Keep your response under 200 words. "
+                "Be direct and conversational — no padding, no filler."
             )
+
+            # If the message was just "jakey" with no other content, pull the last few
+            # lines of conversation and inject them as context into the system prompt
+            # so the AI knows what to respond to. Don't mangle the user content.
+            if is_name_only_trigger:
+                recent_lines = []
+                if channel_context:
+                    for line in channel_context.split("\n"):
+                        if line.startswith("["):
+                            recent_lines.append(line)
+                if recent_lines:
+                    last_msgs = "\n".join(recent_lines[-3:])
+                    system_content += (
+                        f"\n\nNOTE: {message.author.name} just said your name with no other text. "
+                        f"The last messages in the conversation were:\n{last_msgs}\n"
+                        f"Respond naturally to that — pick up the thread, react to what was just said, or engage with it directly. "
+                        f"Do NOT ask 'what do you need' or act confused."
+                    )
+                else:
+                    system_content += (
+                        f"\n\nNOTE: {message.author.name} just said your name with no other text and there's no prior context. "
+                        f"Just say hey back naturally."
+                    )
+                user_content = "jakey"
 
             # Build user message with prominent identity info at the START
             # This ensures the model knows who it's talking to
@@ -1751,7 +1851,10 @@ class JakeyBot(commands.Bot):
             from tools.tool_manager import tool_manager
 
             available_tools = tool_manager.get_available_tools()
-            
+
+            # Filter to only tools relevant to this message — reduces 55-tool payload
+            available_tools = self._filter_tools_for_message(available_tools, user_content)
+
             # Check if current model supports tools - disable tools for problematic models
             model_supports_tools = self._model_supports_tools(self.current_model)
             if not model_supports_tools:
@@ -1763,7 +1866,7 @@ class JakeyBot(commands.Bot):
                 messages=valid_messages,
                 model=self.current_model,
                 temperature=TEMPERATURE,
-                max_tokens=250,  # Reduced from 500 to force brevity (approx 200 words max)
+                max_tokens=500,  # ~200 words max for standard responses
                 tools=available_tools,
                 tool_choice="auto" if available_tools else "none",
                 # Anti-repetition parameters from OpenRouter API
@@ -1884,6 +1987,8 @@ class JakeyBot(commands.Bot):
                 tool_round = 0
                 max_tool_rounds = 5
                 generated_image_urls = []  # Track image URLs to ensure they're in the response
+                used_research_tools = False  # Track if any research/search tools were used
+                RESEARCH_TOOLS = {"web_search", "company_research", "crawling"}
 
                 while tool_calls and tool_round < max_tool_rounds:
                     tool_round += 1
@@ -1995,6 +2100,10 @@ class JakeyBot(commands.Bot):
                                 log_result = log_result[:200] + "..."
                             logger.info(f"Tool result: {function_name} -> {log_result}")
 
+                            # Track if a research tool was used
+                            if function_name in RESEARCH_TOOLS:
+                                used_research_tools = True
+
                             # Track generated image URLs to ensure they appear in the response
                             if (
                                 function_name == "generate_image"
@@ -2059,13 +2168,13 @@ class JakeyBot(commands.Bot):
                             sanitized_tool_calls.append(sanitized_tc)
 
                         # Add the assistant message that requested the tools
-                        # Build message dict, only including content if it has value
+                        # content must always be present per OpenAI API spec;
+                        # use empty string when model returned no text alongside tool call
                         assistant_msg = {
                             "role": "assistant",
+                            "content": assistant_content if assistant_content else "",
                             "tool_calls": sanitized_tool_calls,
                         }
-                        if assistant_content:
-                            assistant_msg["content"] = assistant_content
 
                         valid_messages.append(assistant_msg)
                         # Add the tool results
@@ -2090,12 +2199,28 @@ class JakeyBot(commands.Bot):
                                 f"⚠️ Final tool round - forcing tool_choice='none' to stop loop"
                             )
 
+                        # Research tools get more tokens and relaxed brevity.
+                        # Patch the system message to override the FORCE BREVITY instruction.
+                        followup_max_tokens = 4000 if used_research_tools else 2000
+                        if used_research_tools and valid_messages and valid_messages[0]["role"] == "system":
+                            valid_messages[0]["content"] = valid_messages[0]["content"].replace(
+                                "🛑 **FINAL INSTRUCTION:** "
+                                "You are currently in 'Short Mode'. "
+                                "Your response MUST be under 100 words. "
+                                "Do NOT write more than 4 sentences. "
+                                "If you write a paragraph, you have FAILED.",
+                                "You just completed a web search or research. "
+                                "Give a thorough, well-organized response. "
+                                "Use bullet points or sections if it helps clarity. "
+                                "Be as detailed as needed — don't cut it short."
+                            )
+
                         for attempt in range(max_retries):
                             final_response = await self._ai_manager.generate_text(
                                 messages=valid_messages,
                                 model=self.current_model,
                                 temperature=TEMPERATURE,
-                                max_tokens=2000,
+                                max_tokens=followup_max_tokens,
                                 tools=available_tools if not is_final_round else None,
                                 tool_choice=current_tool_choice,
                                 use_fallback_routing=True,
@@ -2528,19 +2653,19 @@ class JakeyBot(commands.Bot):
         """
         Collect recent channel messages for context.
 
+        Fetches the most recent messages before the current message so that
+        the last 1-2 messages from the user are always included regardless of
+        channel activity level.
+
         Args:
             message: The Discord message object
             limit_minutes: How far back to look (default: 30 minutes)
             message_limit: Maximum number of messages to include (default: 20)
 
         Returns:
-            Formatted string of recent channel messages, or empty string for DMs
+            Formatted string of recent channel messages, or empty string if none
         """
         try:
-            # Return empty for DM channels (no guild)
-            if not message.guild:
-                return ""
-
             channel = message.channel
             if not hasattr(channel, "history"):
                 return ""
@@ -2550,23 +2675,29 @@ class JakeyBot(commands.Bot):
 
             cutoff_time = datetime.now(timezone.utc) - timedelta(minutes=limit_minutes)
 
-            # Collect messages
+            # Fetch messages anchored BEFORE the current message, newest-first.
+            # This guarantees we always get the most recent messages regardless of
+            # how busy the channel is, then we apply the time filter afterwards.
             messages = []
             async for msg in channel.history(
-                limit=message_limit + 5, after=cutoff_time
+                limit=message_limit + 5,
+                before=message,
+                oldest_first=False,
             ):
-                # Skip system messages and the current message
+                # Skip system messages
                 if msg.type != discord.MessageType.default:
                     continue
-                if msg.id == message.id:
-                    continue
+
+                # Stop if message is older than the time window
+                if msg.created_at < cutoff_time:
+                    break
 
                 # Format the message - include bot's own messages too for context
                 timestamp = msg.created_at.strftime("%H:%M")
                 author_name = msg.author.name
                 if msg.author == self.user:
                     author_name = "Jakey (me)"
-                content = msg.content[:300]  # Truncate long messages
+                content = msg.content[:150]  # Truncate long messages
                 if content:  # Only include non-empty messages
                     messages.append(f"[{timestamp}] {author_name}: {content}")
 
@@ -2576,7 +2707,7 @@ class JakeyBot(commands.Bot):
             if not messages:
                 return ""
 
-            # Reverse to show chronological order (oldest first)
+            # Reverse to chronological order (oldest first)
             messages.reverse()
 
             # Format as context

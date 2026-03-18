@@ -150,3 +150,12 @@ config.local.py
 backups/
 
 .claude/
+
+# FatTips wallet data
+*.jakey
+
+# Log directories
+logs/
+
+# MCP memory graph
+.megamemory/

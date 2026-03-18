@@ -51,10 +51,16 @@ def sanitize_messages_for_api(messages: List[Dict[str, Any]]) -> List[Dict[str, 
         # Create sanitized message with required fields
         clean_msg = {"role": role}
         
-        # Handle content field - omit empty strings entirely (don't send null)
+        # Handle content field
+        # For assistant messages with tool_calls, content must always be present
+        # (even as empty string) per OpenAI API spec. For all other messages,
+        # omit empty/null content to avoid validation errors.
         content = msg.get("content")
-        if content:  # Only include content if it's a non-empty string
+        has_tool_calls = bool(msg.get("tool_calls"))
+        if content:
             clean_msg["content"] = content
+        elif role == "assistant" and has_tool_calls:
+            clean_msg["content"] = ""  # Required field even when empty
             
         # Handle tool_calls if present
         if "tool_calls" in msg and msg["tool_calls"]:

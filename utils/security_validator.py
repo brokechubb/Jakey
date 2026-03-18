@@ -20,11 +20,8 @@ class SecurityValidator:
         r'`',              # Command execution
         r'\|\|',           # Command chaining
         r'&&',             # Command chaining
-        r';',              # Command separation
-        r'&',              # Background execution
         r'\|',             # Pipe
         r'>>',             # Append redirection
-        r'<<',             # Here document
         r'~/',             # Home directory paths
         r'\.\./',          # Directory traversal
         r'\/etc\/',        # System directory access
@@ -34,23 +31,17 @@ class SecurityValidator:
         r'rm\s+-',         # Dangerous file operations
         r'dd\s+if=',       # Disk operations
         r'mkfs\.',         # Filesystem operations
-        r'fdisk',          # Disk partitioning
-        r'format',         # Disk formatting
+        r'\bfdisk\b',      # Disk partitioning (word boundary)
+        r'\bformat\s+[a-z]:', # Disk formatting (e.g. "format c:") - not substring match
         r'del\s+/',        # Windows delete operations
         r'rmdir\s+/',      # Directory removal
-        r'chmod\s+[0-7]{3}', # Permission changes
-        r'chown\s+',       # Ownership changes
-        r'sudo\s+',        # Privilege escalation
-        r'su\s+',          # User switching
-        r'passwd\s+',      # Password operations
-        r'crontab',        # Cron operations
-        r'systemctl\s+',   # Service control
-        r'service\s+',     # Service management
-        r'init\s+',        # Init system
-        r'reboot',         # System reboot
-        r'shutdown',       # System shutdown
-        r'poweroff',       # System poweroff
-        r'halt',           # System halt
+        r'chmod\s+[0-7]{3}', # Permission changes (only actual chmod commands)
+        r'\bchown\s+\w+:\w+', # Ownership changes (only actual chown user:group commands)
+        # sudo not blocked - search queries about sudo are legitimate
+        r'passwd\s+-',     # Password operations (passwd with flags only)
+        r'\bcrontab\s+-',  # Cron operations (crontab with flags only)
+        r'systemctl\s+(?:start|stop|restart|enable|disable|mask)\s', # Specific systemctl actions
+        r'\bpoweroff\b',   # System poweroff
     ]
 
     # Shell redirection patterns (separate from general dangerous patterns)
@@ -213,29 +204,15 @@ class SecurityValidator:
     
     @classmethod
     def validate_search_query(cls, query: str) -> tuple[bool, str]:
-        """Validate search query to prevent injection"""
-        is_valid, error = cls.validate_string(query, max_length=1000)
-        if not is_valid:
-            return False, error
-        
-        # Additional search-specific validation
-        dangerous_search_patterns = [
-            r'file:\/\/\/',
-            r'ftp:\/\/',
-            r'ssh:\/\/',
-            r'telnet:\/\/',
-            r'ldap:\/\/',
-            r'smb:\/\/',
-            r'nfs:\/\/',
-            r'git:\/\/',
-            r'svn:\/\/',
-            r'magnet:\/\/',
-        ]
-        
-        for pattern in dangerous_search_patterns:
-            if re.search(pattern, query, re.IGNORECASE):
-                return False, f"Search query contains dangerous protocol: {pattern}"
-        
+        """Validate search query - only basic sanity checks, no content filtering."""
+        if not isinstance(query, str):
+            return False, "Query must be a string"
+        if '\x00' in query:
+            return False, "Null bytes are not allowed"
+        if not query.strip():
+            return False, "Query cannot be empty"
+        if len(query) > 1000:
+            return False, "Query too long (max 1000 characters)"
         return True, ""
     
     @classmethod
@@ -307,46 +284,15 @@ class SecurityValidator:
     
     @classmethod
     def validate_discord_message(cls, message: str) -> tuple[bool, str]:
-        """Validate Discord message content with Discord-specific logic"""
-        is_valid, error = cls.validate_string(message, max_length=2000, allow_empty=False)
-        if not is_valid:
-            return False, error
-
-        # First check if the message contains only safe Discord patterns when using < >
-        # This allows Discord mentions but blocks shell redirection
-        message_lower = message.lower()
-
-        # Check for shell redirection patterns that use < but aren't Discord mentions
-        for pattern in cls.SHELL_REDIRECTION_PATTERNS:
-            if re.search(pattern, message):
-                return False, f"Message contains shell redirection pattern: {pattern}"
-
-        # Check for Discord-specific dangerous patterns (role mentions, @everyone, @here)
-        for pattern in cls.DISCORD_DANGEROUS_PATTERNS:
-            if re.search(pattern, message, re.IGNORECASE):
-                return False, f"Message contains restricted Discord content: {pattern}"
-
-        # Allow the message if it contains safe Discord patterns
-        has_safe_discord_patterns = any(re.search(pattern, message) for pattern in cls.DISCORD_SAFE_PATTERNS)
-
-        # If message contains < characters but no safe Discord patterns, be more strict
-        if '<' in message and not has_safe_discord_patterns:
-            # Check for other potentially dangerous HTML/SSRF patterns
-            dangerous_html_patterns = [
-                r'<\s*script[^>]*>',
-                r'<\s*iframe[^>]*>',
-                r'<\s*object[^>]*>',
-                r'<\s*embed[^>]*>',
-                r'<\s*link[^>]*>',
-                r'<\s*meta[^>]*>',
-                r'<\s*form[^>]*>',
-                r'http[s]?:\/\/[^<\s]*',  # URLs with < around them
-            ]
-
-            for pattern in dangerous_html_patterns:
-                if re.search(pattern, message, re.IGNORECASE):
-                    return False, f"Message contains potentially dangerous HTML pattern: {pattern}"
-
+        """Validate Discord message content - only basic sanity checks, no content filtering."""
+        if not isinstance(message, str):
+            return False, "Message must be a string"
+        if '\x00' in message:
+            return False, "Null bytes are not allowed"
+        if not message.strip():
+            return False, "Message cannot be empty"
+        if len(message) > 2000:
+            return False, "Message too long (max 2000 characters)"
         return True, ""
     
     @classmethod
@@ -475,15 +421,15 @@ class SecurityValidator:
     
     @classmethod
     def validate_company_name(cls, company_name: str) -> tuple[bool, str]:
-        """Validate company name for research"""
-        is_valid, error = cls.validate_string(company_name, max_length=100, allow_empty=False)
-        if not is_valid:
-            return False, error
-        
-        # Additional validation for company names
-        if not re.match(r'^[a-zA-Z0-9\s\.\-&\']+$', company_name):
-            return False, "Company name contains invalid characters"
-        
+        """Validate company name for research - basic sanity checks only."""
+        if not isinstance(company_name, str):
+            return False, "Company name must be a string"
+        if '\x00' in company_name:
+            return False, "Null bytes are not allowed"
+        if not company_name.strip():
+            return False, "Company name cannot be empty"
+        if len(company_name) > 100:
+            return False, "Company name too long (max 100 characters)"
         return True, ""
     
     def is_safe_input(self, input_string: str) -> bool:

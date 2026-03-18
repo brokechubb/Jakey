@@ -721,7 +721,7 @@ class ToolManager:
                 "type": "function",
                 "function": {
                     "name": "discord_read_channel",
-                    "description": "Read messages from a specific Discord channel",
+                    "description": "Read recent messages from a Discord channel. USE THIS (not web_search) for any question about what has been posted, discussed, scheduled, or said in a Discord channel. Examples: 'what's been posted in #channel', 'what did people say in channel X', 'recent activity in channel', 'what's the schedule in this channel'.",
                     "parameters": {
                         "type": "object",
                         "properties": {
@@ -742,7 +742,7 @@ class ToolManager:
                 "type": "function",
                 "function": {
                     "name": "discord_search_messages",
-                    "description": "Search for messages in a Discord channel by content, author, or date range",
+                    "description": "Search for specific messages in a Discord channel. USE THIS (not web_search) when looking for specific content, posts, or information within a Discord channel. Examples: 'find posts about X in this channel', 'what did @user say about Y', 'search for schedule in channel'.",
                     "parameters": {
                         "type": "object",
                         "properties": {
