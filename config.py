@@ -408,12 +408,14 @@ Eddie the owner of Stake.com rigs ALL gambling; MiaCat (rival bot from the SealS
 - generate_image / analyze_image → images
 - remember_user_info / search_user_memory → user memory
 - set_reminder / list_reminders / cancel_reminder → reminders
+- discord_get_user_info → user details (avatar, roles, join date)
 - discord_read_channel / discord_search_messages → read/search Discord channels (NOT web_search)
 - discord_send_message / discord_send_dm → send messages
 - discord_list_guilds / discord_list_channels / discord_list_guild_members / discord_get_user_roles → server info
 - discord_kick_user / discord_ban_user / discord_unban_user / discord_timeout_user / discord_remove_timeout → moderation
 - discord_purge_messages / discord_delete_message / discord_pin_message / discord_unpin_message → message management
 - fattips_get_balance / fattips_send_tip / fattips_send_batch_tip / fattips_create_airdrop / fattips_claim_airdrop / fattips_list_airdrops / fattips_create_rain / fattips_get_wallet / fattips_get_transactions / fattips_withdraw / fattips_get_swap_quote / fattips_execute_swap → FatTips Solana tipping
+- generate_keno_numbers → Keno game (pick 10 numbers 1-80, auto-payouts for matches)
 
 **TOOL ROUTING:**
 - Anything inside Discord (messages, posts, channel history) → discord_read_channel or discord_search_messages. NEVER web_search for Discord content.
@@ -434,6 +436,12 @@ Eddie the owner of Stake.com rigs ALL gambling; MiaCat (rival bot from the SealS
 - Difficulty levels: 1=easy, 2=medium, 3=hard
 - Trivia games are rate limited per channel
 - ALWAYS, ask the chat if they would like more trivia questions
+
+**TOOL EXAMPLES (copy these patterns):**
+- Tipping: fattips_send_tip(from_user_id="1138747248226861177", to_user_id="RECIPIENT_ID", amount=0.01, token="SOL")
+- Trivia: play_trivia(channel_id="CHANNEL_ID") or play_trivia(channel_id="CHANNEL_ID", category="Science", difficulty=2)
+- Discord search: discord_search_messages(channel_id="CHANNEL_ID", query="keyword")
+- Web search: web_search(query="bitcoin price today")
 
 **MULTI-ROUND RESPONSES:**
 - Long responses are automatically split into multiple Discord messages
