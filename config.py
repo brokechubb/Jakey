@@ -366,6 +366,8 @@ TEMPERATURE = float(os.getenv("TEMPERATURE", "0.7"))
 TRIVIA_RANDOM_FALLBACK = (
     os.getenv("TRIVIA_RANDOM_FALLBACK", "true").lower() == "true"
 )  # Enable random answer guess when no answer found
+TRIVIA_ROUND_DELAY = int(os.getenv("TRIVIA_ROUND_DELAY", "8"))  # Seconds between rounds in multi-round sessions
+TRIVIA_SESSION_DEFAULT_ROUNDS = int(os.getenv("TRIVIA_SESSION_DEFAULT_ROUNDS", "5"))  # Default questions when user doesn't specify
 
 # Multi-Round Response Configuration
 MULTI_ROUND_ENABLED = os.getenv("MULTI_ROUND_ENABLED", "true").lower() == "true"
@@ -430,12 +432,14 @@ Eddie the owner of Stake.com rigs ALL gambling; MiaCat (rival bot from the SealS
 - Non-custodial Solana tipping — SOL, USDC, USDT. Users own their keys.
 
 **TRIVIA:**
-- play_trivia tool: Start interactive trivia games
+- play_trivia tool: Start a SINGLE trivia question (for multi-round, use start_trivia_session instead)
+- start_trivia_session tool: Start a multi-round trivia session (user asks for "N rounds" or "trivia session")
 - IMPORTANT: ALWAYS use %triviacats command first to see available categories before specifying a category
 - If you don't specify a category, one will be chosen randomly
 - Difficulty levels: 1=easy, 2=medium, 3=hard
 - Trivia games are rate limited per channel
-- ALWAYS, ask the chat if they would like more trivia questions
+- When a user asks for multiple rounds (e.g., "3 rounds of trivia", "do a trivia session"), use start_trivia_session with the rounds parameter
+- If user doesn't specify number of rounds, default to 5 rounds
 
 **TOOL EXAMPLES (copy these patterns):**
 - Tipping: fattips_send_tip(from_user_id="1138747248226861177", to_user_id="RECIPIENT_ID", amount=0.01, token="SOL")

@@ -68,6 +68,7 @@ class ToolManager:
             "generate_keno_numbers": self.generate_keno_numbers,
             # Trivia tools
             "play_trivia": self.play_trivia,
+            "start_trivia_session": self.start_trivia_session,
             # Discord tools
             "discord_get_user_info": self.discord_get_user_info,
             "discord_list_guilds": self.discord_list_guilds,
@@ -112,8 +113,10 @@ class ToolManager:
         # Initialize Discord tools - will be set later by main.py after bot initialization
         self.discord_tools = None
 
-        # Initialize trivia games dictionary at startup for proper answer detection
+# Initialize trivia games dictionary at startup for proper answer detection
         self._trivia_games = {}  # channel_id -> game_state
+        # Track active multi-round trivia sessions
+        self._trivia_sessions = {}  # channel_id -> {"total_rounds": int, "rounds_completed": int, "category": str, "scores": {user_id: int}, "round_winners": [str|None]}
 
         # Define corrected bonus schedules for different sites
         self.bonus_schedules = {
@@ -1120,7 +1123,7 @@ class ToolManager:
                 "type": "function",
                 "function": {
                     "name": "play_trivia",
-                    "description": "Start an interactive trivia game in the current channel. This creates an engaging trivia question that users in the chat can answer. The AI should wait for user responses and check answers.",
+                    "description": "Start a SINGLE trivia question in the current channel. For multi-round trivia sessions (user asks for 'N rounds' or 'trivia session'), use start_trivia_session instead.",
                     "parameters": {
                         "type": "object",
                         "properties": {
@@ -1135,6 +1138,38 @@ class ToolManager:
                             "difficulty": {
                                 "type": "integer",
                                 "description": "Optional difficulty level (1=easy, 2=medium, 3=hard). Defaults to mixed difficulty.",
+                                "enum": [1, 2, 3],
+                            },
+                        },
+                        "required": ["channel_id"],
+                    },
+                },
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "start_trivia_session",
+                    "description": "Start a multi-round trivia session in the current channel. Use this when the user asks for multiple rounds (e.g., '3 rounds of trivia', 'let's do a trivia session', '5 questions'). For a single question, use play_trivia instead.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "channel_id": {
+                                "type": "string",
+                                "description": "Discord channel ID where to post the trivia questions",
+                            },
+                            "rounds": {
+                                "type": "integer",
+                                "description": "Number of trivia questions in the session. If user doesn't specify, use 5 as default. Minimum 1, maximum 20.",
+                                "minimum": 1,
+                                "maximum": 20,
+                            },
+                            "category": {
+                                "type": "string",
+                                "description": "Optional trivia category for all questions. IMPORTANT: Use %triviacats command first to see available categories. If not provided, a random category will be selected automatically.",
+                            },
+                            "difficulty": {
+                                "type": "integer",
+                                "description": "Optional difficulty level for all questions (1=easy, 2=medium, 3=hard). Defaults to mixed difficulty.",
                                 "enum": [1, 2, 3],
                             },
                         },
@@ -3328,6 +3363,65 @@ class ToolManager:
         except Exception as e:
             logger.error(f"Error in play_trivia: {e}")
             return f"❌ Error starting trivia game: {str(e)}"
+
+
+    async def start_trivia_session(
+        self,
+        channel_id: str,
+        rounds: int = 5,
+        category: str = None,
+        difficulty: int = None
+    ) -> str:
+        """Start a multi-round trivia session in the specified channel
+
+        Args:
+            channel_id: Discord channel ID where to post the trivia questions
+            rounds: Number of trivia questions in the session (default 5, max 20)
+            category: Optional trivia category filter for all questions
+            difficulty: Optional difficulty level for all questions (1=easy, 2=medium, 3=hard)
+
+        Returns:
+            Success message if session started successfully, error message if failed
+        """
+        from config import TRIVIA_SESSION_DEFAULT_ROUNDS
+
+        if rounds is None:
+            rounds = TRIVIA_SESSION_DEFAULT_ROUNDS
+        rounds = max(1, min(20, int(rounds)))
+
+        if hasattr(self, "_trivia_sessions") and channel_id in self._trivia_sessions:
+            session = self._trivia_sessions[channel_id]
+            return (
+                f"❌ A trivia session is already active in this channel "
+                f"({session['rounds_completed'] + 1} of {session['total_rounds']} rounds completed). "
+                f"Wait for it to finish before starting a new one."
+            )
+
+        if channel_id in self._trivia_games:
+            return "❌ There's already an active trivia question in this channel! Wait for it to finish."
+
+        if not hasattr(self, "_trivia_sessions"):
+            self._trivia_sessions = {}
+
+        self._trivia_sessions[channel_id] = {
+            "total_rounds": rounds,
+            "rounds_completed": 0,
+            "category": category,
+            "difficulty": difficulty,
+            "scores": {},
+            "round_winners": [],
+        }
+
+        logger.info(f"Started trivia session in channel {channel_id}: {rounds} rounds, category={category}")
+
+        result = await self.play_trivia(channel_id, category, difficulty)
+
+        if "successfully" in result.lower() or "🎮" in result:
+            return f"🎯 **Trivia session started!** {rounds} rounds, first question incoming..."
+        else:
+            if channel_id in self._trivia_sessions:
+                del self._trivia_sessions[channel_id]
+            return result
 
     def check_trivia_answer(self, channel_id: str, user_answer: str) -> tuple:
         """Check if a user's answer to the active trivia game is correct

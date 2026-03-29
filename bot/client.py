@@ -875,7 +875,7 @@ class JakeyBot(commands.Bot):
             "web_search", "get_current_time", "calculate",
             "remember_user_info", "search_user_memory",
             # Games - essential for server engagement
-            "play_trivia", "generate_keno_numbers",
+            "play_trivia", "start_trivia_session", "generate_keno_numbers",
             # FatTips - frequently needed for tipping/rain
             "fattips_get_balance", "fattips_send_tip", "fattips_create_rain",
             "fattips_get_wallet", "fattips_list_airdrops",
@@ -954,7 +954,7 @@ class JakeyBot(commands.Bot):
               "lottery", "lotto", "pick", "numbers", "jackpot", "pot", "winnings",
               "winner", "lose", "lost", "won", "round", "next question",
               "challenge", "duel", "compete", "points", "score", "leaderboard"],
-             {"generate_keno_numbers", "play_trivia"}),
+             {"generate_keno_numbers", "play_trivia", "start_trivia_session"}),
             # Legacy tip.cc
             (["tip.cc", "tipcc", "bonus", "airdrop",
               "free coins", "faucet", "claim", "giveaway", "give away", "drop"],
@@ -1476,13 +1476,39 @@ class JakeyBot(commands.Bot):
                             except Exception as tip_error:
                                 logger.error(f"Error sending trivia tip: {tip_error}")
 
-                            response += "Want to play again? Just ask me for another trivia question!"
+                            # Check if this is part of a multi-round session
+                            session = getattr(self.tool_manager, "_trivia_sessions", {}).get(channel_id)
+                            if session:
+                                # Update session state
+                                session["rounds_completed"] += 1
+                                session["round_winners"].append(message.author.display_name)
+                                session["scores"][str(message.author.id)] = session["scores"].get(str(message.author.id), 0) + 1
 
-                            await message.channel.send(response)
-                            logger.info(
-                                f"Trivia answer correct from {message.author.name} in channel {channel_id}"
-                            )
-                            return  # Don't process as regular message
+                                if session["rounds_completed"] < session["total_rounds"]:
+                                    # More rounds to go
+                                    next_round = session["rounds_completed"] + 1
+                                    response += f"\n📊 **Round {session['rounds_completed']} of {session['total_rounds']} complete!** Round {next_round} in 8 seconds..."
+                                    await message.channel.send(response)
+                                    logger.info(
+                                        f"Trivia round {session['rounds_completed']} correct from {message.author.name} in channel {channel_id}, advancing to round {next_round}"
+                                    )
+                                    # Schedule next round
+                                    asyncio.create_task(self._advance_trivia_round(channel_id))
+                                    return
+                                else:
+                                    # Session complete - show scoreboard
+                                    response += f"\n📊 **Final Round!** Session complete!"
+                                    await message.channel.send(response)
+                                    await self._finish_trivia_session(channel_id)
+                                    return
+                            else:
+                                # Single question mode
+                                response += "Want to play again? Just ask me for another trivia question!"
+                                await message.channel.send(response)
+                                logger.info(
+                                    f"Trivia answer correct from {message.author.name} in channel {channel_id}"
+                                )
+                                return  # Don't process as regular message
                         elif game_ended:
                             # Game timed out while checking
                             await message.channel.send(
@@ -1893,6 +1919,28 @@ class JakeyBot(commands.Bot):
                 f"\n\nIMPORTANT: Use these IDs directly for tool calls. Do NOT call list_guilds or list_channels to find the current location."
             )
             system_content += current_context_info
+
+            # Inject trivia context if a game or session is active in this channel
+            if message.guild and hasattr(self, "tool_manager") and self.tool_manager:
+                channel_id = str(message.channel.id)
+                # Check for active session first (multi-round)
+                session = getattr(self.tool_manager, "_trivia_sessions", {}).get(channel_id)
+                if session:
+                    trivia_note = (
+                        f"\n\n[TRIVIA SESSION ACTIVE: Round {session['rounds_completed'] + 1} of "
+                        f"{session['total_rounds']} is in progress in this channel. "
+                        f"DO NOT call start_trivia_session or play_trivia — a question is already waiting for an answer. "
+                        f"You may briefly answer this message, but remind the chat the trivia question is still open.]"
+                    )
+                    system_content += trivia_note
+                elif channel_id in getattr(self.tool_manager, "_trivia_games", {}):
+                    # Single question active
+                    trivia_note = (
+                        f"\n\n[TRIVIA ACTIVE: A trivia question is in progress in this channel. "
+                        f"DO NOT call play_trivia or start_trivia_session. "
+                        f"You may briefly answer this message, but remind the chat the trivia question is still waiting for an answer.]"
+                    )
+                    system_content += trivia_note
 
             # FORCE BREVITY: Add a final, unignorable instruction at the very end
             system_content += (
@@ -6225,6 +6273,94 @@ class JakeyBot(commands.Bot):
             logger.error(f"Error processing queued AI message: {e}")
             return False
 
+
+    async def _advance_trivia_round(self, channel_id: str):
+        """Advance to the next round of a multi-round trivia session after a delay"""
+        from config import TRIVIA_ROUND_DELAY
+
+        try:
+            await asyncio.sleep(TRIVIA_ROUND_DELAY)
+
+            # Get the session
+            session = getattr(self.tool_manager, "_trivia_sessions", {}).get(channel_id)
+            if not session:
+                logger.warning(f"No trivia session found for channel {channel_id} when advancing round")
+                return
+
+            # Post the next question
+            result = await self.tool_manager.play_trivia(
+                channel_id, session.get("category"), session.get("difficulty")
+            )
+
+            if "successfully" in result.lower() or "🎮" in result:
+                logger.info(f"Advanced to round {session['rounds_completed'] + 1} in channel {channel_id}")
+            else:
+                # Question failed, clean up session
+                logger.error(f"Failed to post trivia question in channel {channel_id}: {result}")
+                if channel_id in self.tool_manager._trivia_sessions:
+                    del self.tool_manager._trivia_sessions[channel_id]
+                channel = self.get_channel(int(channel_id))
+                if channel:
+                    await channel.send(f"❌ Trivia session ended early due to error: {result}")
+
+        except Exception as e:
+            logger.error(f"Error advancing trivia round: {e}")
+            # Clean up session on error
+            if hasattr(self.tool_manager, "_trivia_sessions") and channel_id in self.tool_manager._trivia_sessions:
+                del self.tool_manager._trivia_sessions[channel_id]
+
+    async def _finish_trivia_session(self, channel_id: str):
+        """Complete a multi-round trivia session and post the final scoreboard"""
+        try:
+            session = getattr(self.tool_manager, "_trivia_sessions", {}).get(channel_id)
+            if not session:
+                return
+
+            # Build scoreboard
+            total_rounds = session["total_rounds"]
+            scores = session["scores"]
+            round_winners = session["round_winners"]
+
+            scoreboard = f"\n🏆 **TRIVIA SESSION COMPLETE!** 🏆\n"
+            scoreboard += f"📊 **{total_rounds} rounds played**\n\n"
+
+            if scores:
+                # Sort by score descending
+                sorted_scores = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+                scoreboard += "**🥇 Leaderboard:**\n"
+                for rank, (user_id, wins) in enumerate(sorted_scores, 1):
+                    medal = "🥇" if rank == 1 else "🥈" if rank == 2 else "🥉" if rank == 3 else "  "
+                    scoreboard += f"{medal} <@{user_id}> - {wins} wins\n"
+            else:
+                scoreboard += "No correct answers this session 😅\n"
+
+            # Round-by-round breakdown
+            scoreboard += "\n**📝 Round Summary:**\n"
+            for i, winner in enumerate(round_winners, 1):
+                if winner:
+                    scoreboard += f"Round {i}: {winner} ✓\n"
+                else:
+                    scoreboard += f"Round {i}: ⏰ Timed out\n"
+
+            scoreboard += f"\nWant to play again? Just ask for another trivia session!"
+
+            # Send scoreboard
+            channel = self.get_channel(int(channel_id))
+            if channel:
+                await channel.send(scoreboard)
+
+            # Clean up session
+            if channel_id in self.tool_manager._trivia_sessions:
+                del self.tool_manager._trivia_sessions[channel_id]
+
+            logger.info(f"Trivia session completed in channel {channel_id}")
+
+        except Exception as e:
+            logger.error(f"Error finishing trivia session: {e}")
+            # Clean up session on error
+            if hasattr(self.tool_manager, "_trivia_sessions") and channel_id in self.tool_manager._trivia_sessions:
+                del self.tool_manager._trivia_sessions[channel_id]
+
     async def _monitor_trivia_timeouts(self):
         """Background task to check for trivia game timeouts and notify channels"""
         try:
@@ -6273,13 +6409,43 @@ class JakeyBot(commands.Bot):
                                     answer = game.get("question", {}).get(
                                         "answer_text", "Unknown Answer"
                                     )
-                                    await channel.send(
-                                        f"⏰ **Time's up!** The correct answer was: **{answer}**\n"
-                                        f"Better luck next time! Want another? Just ask me to play trivia again!"
-                                    )
-                                    logger.info(
-                                        f"Trivia game timed out in channel {channel_id}"
-                                    )
+
+                                    # Check if this is part of a multi-round session
+                                    session = getattr(self.tool_manager, "_trivia_sessions", {}).get(channel_id)
+                                    if session:
+                                        # Update session state - no winner for this round
+                                        session["rounds_completed"] += 1
+                                        session["round_winners"].append(None)  # None indicates timeout
+
+                                        if session["rounds_completed"] < session["total_rounds"]:
+                                            # More rounds to go
+                                            next_round = session["rounds_completed"] + 1
+                                            await channel.send(
+                                                f"⏰ **Time's up!** The correct answer was: **{answer}**\n"
+                                                f"📊 **Round {session['rounds_completed']} of {session['total_rounds']}** - No winner\n"
+                                                f"Round {next_round} in 8 seconds..."
+                                            )
+                                            logger.info(
+                                                f"Trivia round {session['rounds_completed']} timed out in channel {channel_id}, advancing to round {next_round}"
+                                            )
+                                            # Schedule next round
+                                            asyncio.create_task(self._advance_trivia_round(channel_id))
+                                        else:
+                                            # Session complete - show scoreboard
+                                            await channel.send(
+                                                f"⏰ **Time's up!** The correct answer was: **{answer}**\n"
+                                                f"📊 **Final Round!** Session complete!"
+                                            )
+                                            await self._finish_trivia_session(channel_id)
+                                    else:
+                                        # Single question mode
+                                        await channel.send(
+                                            f"⏰ **Time's up!** The correct answer was: **{answer}**\n"
+                                            f"Better luck next time! Want another? Just ask me to play trivia again!"
+                                        )
+                                        logger.info(
+                                            f"Trivia game timed out in channel {channel_id}"
+                                        )
                                 else:
                                     logger.warning(
                                         f"Could not find channel {channel_id} for timeout notification"
