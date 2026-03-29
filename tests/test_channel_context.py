@@ -44,8 +44,8 @@ class TestChannelContext(unittest.TestCase):
                 "limit_minutes should default to 30"
             )
             self.assertEqual(
-                sig.parameters['message_limit'].default, 10,
-                "message_limit should default to 10"
+                sig.parameters['message_limit'].default, 20,
+                "message_limit should default to 20"
             )
             
         except Exception as e:

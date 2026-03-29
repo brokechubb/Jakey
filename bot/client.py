@@ -70,6 +70,11 @@ THINKING_BLOCK_PATTERNS = [
         r"^(?:Let me think|I need to|First,? I|Step \d+:).*?(?=\n\n[A-Z]|\n\n\*\*|$)",
         re.DOTALL | re.MULTILINE,
     ),
+    # Asterisk roleplay actions describing tool usage (model pretending to use tools)
+    re.compile(
+        r"\*(?:searches?|checks?|looks? up|finds?|gets?|calls?|uses?|runs?|executes?|queries?|fetches?|retrieves?)[^*]*\*",
+        re.IGNORECASE,
+    ),
 ]
 
 RAW_FUNCTION_PATTERN = re.compile(r"\b[a-z_]+\s*\{[^}]*\}", re.IGNORECASE)
@@ -94,6 +99,10 @@ JSON_TOOL_CALL_PATTERN = re.compile(
 )
 END_TOKEN_PATTERN = re.compile(r"</s>\s*$")
 MULTIPLE_NEWLINES_PATTERN = re.compile(r"\n\s*\n\s*\n")
+SPECIAL_TOKEN_PATTERN = re.compile(
+    r"<\|tool_call_end\|>|<\|tool_calls_section_end\|>|<\|tool_calls_section\|>|<\|tool_call_start\|>|<\|[^|>]+\|>",
+    re.IGNORECASE,
+)
 
 
 def extract_text_tool_calls(ai_response: str) -> Tuple[List[Dict], str]:
@@ -348,6 +357,9 @@ def sanitize_ai_response(response: str) -> str:
     # Remove trailing </s> tokens some models add
     sanitized = END_TOKEN_PATTERN.sub("", sanitized)
 
+    # Remove special token markers that may leak from model outputs
+    sanitized = SPECIAL_TOKEN_PATTERN.sub("", sanitized)
+
     # Clean up multiple newlines and whitespace
     sanitized = MULTIPLE_NEWLINES_PATTERN.sub("\n\n", sanitized)
     sanitized = sanitized.strip()
@@ -484,6 +496,33 @@ def extract_final_response_from_reasoning(reasoning: str) -> str:
     return ""
 
 
+def extract_content_str(content) -> str:
+    """
+    Safely extract a plain string from an AI response content field.
+
+    Some providers (e.g. Anthropic-style) return content as a list of blocks:
+        [{'type': 'text', 'text': 'hello'}]
+    Others return a plain string or None.  This normalises all three cases.
+    """
+    if content is None:
+        return ""
+    if isinstance(content, str):
+        return content.strip()
+    if isinstance(content, list):
+        parts = []
+        for block in content:
+            if isinstance(block, dict):
+                # {'type': 'text', 'text': '...'} — most common block format
+                text = block.get("text", "")
+                if isinstance(text, str) and text.strip():
+                    parts.append(text.strip())
+            elif isinstance(block, str) and block.strip():
+                parts.append(block.strip())
+        return "\n".join(parts)
+    # Fallback: coerce whatever we got
+    return str(content).strip()
+
+
 def handle_command_error(error: Exception, ctx, command_name: str) -> str:
     """Handle command errors with sanitization."""
     sanitized_msg = sanitize_error_message(str(error))
@@ -525,6 +564,11 @@ from config import (
     GENDER_ROLES_GUILD_ID,
     GUILD_BLACKLIST,
     IMAGE_API_RATE_LIMIT,
+    MULTI_ROUND_ENABLED,
+    MULTI_ROUND_FOLLOWUP_MARKER,
+    MULTI_ROUND_MAX_FOLLOWUPS,
+    MULTI_ROUND_SPLIT_LONG,
+    MULTI_ROUND_STATUS_MESSAGES,
     QUICK_MODEL_SUGGESTIONS,
     RATE_LIMIT_COOLDOWN,
     RELAY_MENTION_ROLE_MAPPINGS,
@@ -740,20 +784,36 @@ class JakeyBot(commands.Bot):
             return False
         
         # Special case: Known models that support tools regardless of API data
-        # Updated with actual Pollinations models (Jan 2026)
+        # Models confirmed available on the local endpoint
         trusted_tool_models = [
-            "evil",
-            "openai",
-            "openai-fast",
-            "gemini",
-            "gemini-search",
-            "mistral",
-            "qwen-coder",
-            "roblox-rp",
-            "unity",
-            "bidara",
-            "qwen3-coder-plus",  # Works well with tools
-            "qwen3-max",  # Works well with tools
+            "kimi-k2",                             # IFLOW — uncensored
+            "kimi-k2.5",                           # OLLAMA CLOUD — uncensored
+            "kimi-k2-instruct",                    # MOONSHOT NIM
+            "kimi-k2-instruct-0905",               # MOONSHOT NIM variant
+            "kimi-k2-thinking",                    # OLLAMA CLOUD thinking variant
+            "llama-4-maverick",                    # META NIM — uncensored
+            "llama-4-scout",                       # META NIM
+            "llama-3.3-70b-instruct",              # META NIM
+            "llama-3.1-nemotron-ultra-253b",       # NVIDIA NIM
+            "llama-3.1-nemotron-70b-instruct",     # NVIDIA NIM
+            "llama-3.1-nemotron-51b-instruct",     # NVIDIA NIM
+            "mistral-large-3-675b-instruct-2512",  # MISTRAL NIM — minimal filtering
+            "mistral-small-3.1-24b-instruct-2503", # MISTRAL NIM
+            "devstral-2-123b-instruct-2512",       # MISTRAL NIM
+            "ministral-14b-instruct-2512",         # MISTRAL NIM
+            "qwen3-coder-plus",                    # QWEN — stable tool use
+            "qwen3-max",                           # IFLOW
+            "qwen3-max-preview",                   # IFLOW
+            "qwen3-235b",                          # IFLOW
+            "qwen3-235b-a22b-instruct",            # IFLOW
+            "qwen3-32b",                           # IFLOW
+            "qwen3-coder-480b-a35b-instruct",      # QWEN NIM
+            "qwen3-next",                          # OLLAMA CLOUD
+            "qwen3-coder-next",                    # OLLAMA CLOUD
+            "deepseek-v3.1-terminus",              # DEEPSEEK NIM (different from broken v3.1)
+            "gpt-oss-120b",                        # OLLAMA CLOUD
+            "minimax-m2.5",                        # OLLAMA CLOUD
+            "minimax-m2.1",                        # MINIMAX NIM
         ]
         if model_key in trusted_tool_models:
             logger.debug(f"Model '{model_key}' is in trusted tool models list")
@@ -810,9 +870,19 @@ class JakeyBot(commands.Bot):
         msg = message_content.lower()
 
         # Core tools always included — needed for any response
+        # These are essential tools that should ALWAYS be available
         ALWAYS_INCLUDE = {
             "web_search", "get_current_time", "calculate",
             "remember_user_info", "search_user_memory",
+            # Games - essential for server engagement
+            "play_trivia", "generate_keno_numbers",
+            # FatTips - frequently needed for tipping/rain
+            "fattips_get_balance", "fattips_send_tip", "fattips_create_rain",
+            "fattips_get_wallet", "fattips_list_airdrops",
+            # Images - commonly used
+            "generate_image", "analyze_image",
+            # Discord basics
+            "discord_get_user_info", "discord_send_message", "discord_send_dm",
         }
 
         # Keyword → tool names to add
@@ -820,7 +890,10 @@ class JakeyBot(commands.Bot):
             # Discord operations
             (["channel", "server", "guild", "message", "post", "chat", "read", "search", "pin",
               "who", "members", "roles", "kick", "ban", "timeout", "purge", "delete", "send",
-              "dm", "announce", "mod", "mute", "unban"],
+              "dm", "announce", "mod", "mute", "unban",
+              "convo", "thread", "history", "logs", "nuke", "wipe", "clear",
+              "silence", "shut up", "boot", "remove", "invite", "perm", "perms",
+              "permissions", "mod log", "audit", "snipe", "ghost", "lurk"],
              {"discord_read_channel", "discord_search_messages", "discord_send_message",
               "discord_send_dm", "discord_list_channels", "discord_list_guilds",
               "discord_list_guild_members", "discord_get_user_roles", "discord_get_user_info",
@@ -830,35 +903,61 @@ class JakeyBot(commands.Bot):
               "discord_pin_message", "discord_unpin_message"}),
             # Crypto / prices
             (["price", "crypto", "bitcoin", "btc", "eth", "sol", "coin", "token",
-              "stock", "market", "$", "worth", "value"],
+              "stock", "market", "$", "worth", "value",
+              "how much", "cost", "chart", "ath", "dip", "dump", "rug", "rekt",
+              "mooning", "pumping", "dumping", "floor", "mcap", "cap", "dominance",
+              "altcoin", "defi", "nft", "gas", "gwei", "fees", "ticker",
+              "binance", "coinbase", "kraken", "uniswap", "trading"],
              {"get_crypto_price", "get_stock_price"}),
             # Images
             (["image", "picture", "photo", "draw", "generate", "create", "make", "show",
-              "look", "analyze", "what is this"],
+              "look", "analyze", "what is this",
+              "paint", "sketch", "render", "art", "artwork", "illustration", "design",
+              "visualize", "vision", "see", "pic", "img", "selfie", "screenshot",
+              "what's in", "describe this", "avatar", "banner", "wallpaper"],
              {"generate_image", "analyze_image"}),
             # Reminders
-            (["remind", "reminder", "alarm", "timer", "alert", "notify", "schedule"],
+            (["remind", "reminder", "alarm", "timer", "alert", "notify", "schedule",
+              "don't forget", "dont forget", "remember to", "ping me", "tell me later",
+              "wake me", "in an hour", "in a minute", "later today", "tomorrow",
+              "set a", "countdown", "due", "deadline"],
              {"set_reminder", "list_reminders", "cancel_reminder", "check_due_reminders"}),
             # Research
-            (["research", "company", "about", "crawl", "website", "url", "http"],
+            (["research", "company", "about", "crawl", "website", "url", "http",
+              "look up", "look into", "dig into", "find out", "investigate", "check out",
+              "what is", "who is", "tell me about", "info on", "details on",
+              "wiki", "wikipedia", "source", "link", "site", "page", "article"],
              {"company_research", "crawling"}),
             # FatTips
             (["tip", "tips", "fattips", "fat tips", "rain", "airdrop", "wallet",
               "balance", "sol", "usdc", "usdt", "withdraw", "swap", "deposit",
-              "crypto", "send", "transfer", "leaderboard"],
+              "crypto", "send", "transfer", "leaderboard", "juice",
+              "bless", "blessed", "drip", "hit me", "bread", "bread up",
+              "stack", "stacks", "chips", "drop", "throw", "throw some",
+              "hit", "bag", "bags", "feed", "fed", "loot", "fund", "funded",
+              "hook up", "hook", "shower", "splash", "baller", "ball out",
+              "payout", "pay out", "cash out", "cashout", "bankroll", "roll",
+              "degen", "ape", "aping", "send it", "moon", "pump"],
              {"fattips_get_balance", "fattips_send_tip", "fattips_send_batch_tip",
               "fattips_create_airdrop", "fattips_claim_airdrop", "fattips_list_airdrops",
               "fattips_create_rain", "fattips_get_wallet", "fattips_create_wallet",
               "fattips_get_transactions", "fattips_withdraw",
               "fattips_get_swap_quote", "fattips_execute_swap", "fattips_get_leaderboard"}),
             # Rate limits / admin
-            (["rate limit", "rate", "limit", "reset", "admin", "stats"],
+            (["rate limit", "rate", "limit", "reset", "admin", "stats",
+              "slow down", "slowing", "throttle", "cooldown", "cool down",
+              "too fast", "blocked", "restricted", "quota", "usage", "status"],
              {"get_user_rate_limit_status", "get_system_rate_limit_stats", "reset_user_rate_limits"}),
             # Games
-            (["keno", "trivia", "game", "play", "question", "quiz", "gamble"],
+            (["keno", "trivia", "game", "play", "question", "quiz", "gamble",
+              "bet", "betting", "wager", "odds", "roll", "dice", "spin", "slots",
+              "lottery", "lotto", "pick", "numbers", "jackpot", "pot", "winnings",
+              "winner", "lose", "lost", "won", "round", "next question",
+              "challenge", "duel", "compete", "points", "score", "leaderboard"],
              {"generate_keno_numbers", "play_trivia"}),
             # Legacy tip.cc
-            (["tip.cc", "tipcc", "bonus", "airdrop"],
+            (["tip.cc", "tipcc", "bonus", "airdrop",
+              "free coins", "faucet", "claim", "giveaway", "give away", "drop"],
              {"tip_user", "check_balance", "get_bonus_schedule"}),
         ]
 
@@ -873,7 +972,11 @@ class JakeyBot(commands.Bot):
         if len(filtered) >= len(all_tools) - 5:
             return all_tools
 
-        logger.debug(f"Tool filtering: {len(all_tools)} → {len(filtered)} tools for this message")
+        # Log at INFO level so we can see what's being filtered
+        logger.info(f"Tool filtering: {len(all_tools)} → {len(filtered)} tools for this message")
+        if logger.isEnabledFor(logging.DEBUG):
+            excluded = [t["function"]["name"] for t in all_tools if t["function"]["name"] not in wanted]
+            logger.debug(f"Excluded tools: {excluded}")
         return filtered
 
     # Anti-Repetition Methods
@@ -1922,7 +2025,7 @@ class JakeyBot(commands.Bot):
             if "choices" in response and len(response["choices"]) > 0:
                 ai_message = response["choices"][0]["message"]
                 content = ai_message.get("content", "")
-                ai_response = content.strip() if content else ""
+                ai_response = extract_content_str(content)
 
                 # Debug: Log what we received
                 logger.info(
@@ -1986,7 +2089,7 @@ class JakeyBot(commands.Bot):
                 # Multi-round tool execution loop
                 tool_round = 0
                 max_tool_rounds = 5
-                generated_image_urls = []  # Track image URLs to ensure they're in the response
+                # Note: generated_image_urls is defined in outer scope (line 1998)
                 used_research_tools = False  # Track if any research/search tools were used
                 RESEARCH_TOOLS = {"web_search", "company_research", "crawling"}
 
@@ -2062,6 +2165,25 @@ class JakeyBot(commands.Bot):
                                     except ValueError:
                                         pass  # Keep as string if not a valid number
 
+                            # Normalize parameter names for tools that commonly receive wrong names
+                            PARAM_ALIASES = {
+                                "fattips_send_tip": {
+                                    "from_user": "from_user_id",
+                                    "to_user": "to_user_id",
+                                },
+                                "fattips_create_rain": {
+                                    "user_id": "creator_id",
+                                },
+                                "fattips_claim_airdrop": {
+                                    "user_id": "claimant_id",
+                                },
+                            }
+                            aliases = PARAM_ALIASES.get(function_name, {})
+                            for wrong_name, correct_name in aliases.items():
+                                if wrong_name in arguments:
+                                    arguments[correct_name] = arguments.pop(wrong_name)
+                                    logger.info(f"Normalized parameter '{wrong_name}' -> '{correct_name}' for {function_name}")
+
                             # Validate required parameters for common tools
                             # If model sent empty args for a tool that needs params, skip it
                             TOOL_REQUIRED_PARAMS = {
@@ -2076,6 +2198,9 @@ class JakeyBot(commands.Bot):
                                 "tip_user": ["recipient_id", "amount", "token"],
                                 "discord_send_message": ["channel_id", "content"],
                                 "discord_send_dm": ["user_id", "content"],
+                                "fattips_send_tip": ["from_user_id", "to_user_id", "amount", "token"],
+                                "fattips_create_rain": ["creator_id", "token", "amount_per_user", "number_of_users"],
+                                "fattips_claim_airdrop": ["claimant_id", "airdrop_id"],
                             }
 
                             required = TOOL_REQUIRED_PARAMS.get(function_name, [])
@@ -2087,6 +2212,18 @@ class JakeyBot(commands.Bot):
                                     f"Tool {function_name} missing required params: {missing}, skipping execution"
                                 )
                             else:
+                                # Multi-round: Send status message for slow tools
+                                status_msg = None
+                                if MULTI_ROUND_ENABLED and MULTI_ROUND_STATUS_MESSAGES:
+                                    from config import SLOW_TOOLS
+                                    if function_name in SLOW_TOOLS:
+                                        tool_info = SLOW_TOOLS[function_name]
+                                        try:
+                                            status_msg = await message.channel.send(tool_info["message"])
+                                            logger.info(f"Sent status message for slow tool: {function_name}")
+                                        except Exception as e:
+                                            logger.warning(f"Failed to send status message: {e}")
+                                
                                 # Execute the tool
                                 logger.info(
                                     f"Executing tool: {function_name} with args: {arguments}"
@@ -2094,6 +2231,13 @@ class JakeyBot(commands.Bot):
                                 result = await tool_manager.execute_tool(
                                     function_name, arguments, str(message.author.id)
                                 )
+                                
+                                # Multi-round: Delete status message after tool completes
+                                if status_msg:
+                                    try:
+                                        await status_msg.delete()
+                                    except Exception:
+                                        pass
                             # Truncate result for logging
                             log_result = str(result)
                             if len(log_result) > 200:
@@ -2280,7 +2424,7 @@ class JakeyBot(commands.Bot):
                                     ai_message.get("reasoning", "")
                                 )
 
-                            ai_response = content.strip() if content else ""
+                            ai_response = extract_content_str(content)
                             tool_calls = ai_message.get("tool_calls", [])
 
                             # Check for text-based tool calls again (defensive)
@@ -2307,7 +2451,7 @@ class JakeyBot(commands.Bot):
                                     ai_response = "*(I stopped because I was getting stuck in a loop)*"
                         else:
                             # No valid choices or error response structure
-                            ai_response = final_response.get("content", "")
+                            ai_response = extract_content_str(final_response.get("content", ""))
                             tool_calls = []
 
                         # Loop continues if tool_calls is not empty
@@ -2515,23 +2659,67 @@ class JakeyBot(commands.Bot):
             async with message.channel.typing():
                 await asyncio.sleep(typing_time)
 
-            # Discord has a 2000 character limit - truncate if needed
-            if len(ai_response) > 2000:
-                original_length = len(ai_response)
-                # Try to truncate at a sentence boundary
-                truncated = ai_response[:1990]
-                last_period = truncated.rfind(".")
-                last_newline = truncated.rfind("\n")
-                cut_point = max(last_period, last_newline)
-                if cut_point > 1500:  # Only use sentence boundary if reasonable
-                    ai_response = truncated[: cut_point + 1] + "..."
-                else:
-                    ai_response = truncated + "..."
-                logger.info(
-                    f"Truncated response from {original_length} to {len(ai_response)} chars"
-                )
+            # Multi-round: Check for follow-up marker and split response
+            followup_parts = []
+            main_response = ai_response
+            
+            if MULTI_ROUND_ENABLED and MULTI_ROUND_FOLLOWUP_MARKER in ai_response:
+                parts = ai_response.split(MULTI_ROUND_FOLLOWUP_MARKER)
+                main_response = parts[0].strip()
+                followup_parts = [p.strip() for p in parts[1:] if p.strip()]
+                logger.info(f"Detected {len(followup_parts)} follow-up message(s)")
 
-            await message.channel.send(ai_response)
+            # Multi-round: Split long responses into multiple messages
+            messages_to_send = []
+            if MULTI_ROUND_ENABLED and MULTI_ROUND_SPLIT_LONG and len(main_response) > 2000:
+                messages_to_send = self._split_long_message(main_response)
+                logger.info(f"Split long response into {len(messages_to_send)} messages")
+            else:
+                messages_to_send = [main_response]
+
+            # Discord has a 2000 character limit - truncate if splitting is disabled
+            if not MULTI_ROUND_ENABLED or not MULTI_ROUND_SPLIT_LONG:
+                if len(main_response) > 2000:
+                    original_length = len(main_response)
+                    truncated = main_response[:1990]
+                    last_period = truncated.rfind(".")
+                    last_newline = truncated.rfind("\n")
+                    cut_point = max(last_period, last_newline)
+                    if cut_point > 1500:
+                        main_response = truncated[: cut_point + 1] + "..."
+                    else:
+                        main_response = truncated + "..."
+                    logger.info(
+                        f"Truncated response from {original_length} to {len(main_response)} chars"
+                    )
+                    messages_to_send = [main_response]
+
+            # Final safety: ensure we're sending a non-empty plain string.
+            if not isinstance(main_response, str):
+                main_response = extract_content_str(main_response)
+            if not main_response.strip():
+                logger.warning("ai_response is blank immediately before send — suppressing empty message")
+                await message.channel.send("💀 **I got the info but had nothing useful to say. Try rephrasing?**")
+                return
+
+            # Send main message(s)
+            for i, msg_text in enumerate(messages_to_send):
+                if msg_text.strip():
+                    await message.channel.send(msg_text)
+                    if i < len(messages_to_send) - 1:
+                        await asyncio.sleep(0.5)  # Small delay between split messages
+
+            # Multi-round: Send follow-up messages
+            if followup_parts and MULTI_ROUND_ENABLED:
+                followup_count = 0
+                for followup in followup_parts[:MULTI_ROUND_MAX_FOLLOWUPS]:
+                    if followup.strip():
+                        await asyncio.sleep(1.0)  # Delay before follow-up
+                        await message.channel.send(followup)
+                        followup_count += 1
+                        logger.info(f"Sent follow-up message {followup_count}")
+                if len(followup_parts) > MULTI_ROUND_MAX_FOLLOWUPS:
+                    logger.warning(f"Truncated {len(followup_parts) - MULTI_ROUND_MAX_FOLLOWUPS} follow-up messages")
 
             # Remove thinking reaction after sending response
             try:
@@ -2563,6 +2751,52 @@ class JakeyBot(commands.Bot):
         except Exception as e:
             # Silent fail - don't expose automation errors to Discord
             logger.error(f"Error in process_jakey_response: {e}")
+
+    def _split_long_message(self, text: str, max_length: int = 1990) -> list:
+        """Split a long message into multiple parts at natural boundaries."""
+        if len(text) <= max_length:
+            return [text]
+        
+        parts = []
+        remaining = text
+        
+        while len(remaining) > max_length:
+            # Try to find a good split point
+            split_point = max_length
+            
+            # Look for paragraph break first
+            para_break = remaining.rfind("\n\n", 0, max_length)
+            if para_break > max_length // 2:
+                split_point = para_break + 2
+            else:
+                # Look for line break
+                line_break = remaining.rfind("\n", 0, max_length)
+                if line_break > max_length // 2:
+                    split_point = line_break + 1
+                else:
+                    # Look for sentence end
+                    sentence_end = max(
+                        remaining.rfind(". ", 0, max_length),
+                        remaining.rfind("! ", 0, max_length),
+                        remaining.rfind("? ", 0, max_length),
+                    )
+                    if sentence_end > max_length // 2:
+                        split_point = sentence_end + 2
+                    else:
+                        # Look for word boundary
+                        word_boundary = remaining.rfind(" ", 0, max_length)
+                        if word_boundary > max_length // 2:
+                            split_point = word_boundary + 1
+            
+            part = remaining[:split_point].strip()
+            if part:
+                parts.append(part)
+            remaining = remaining[split_point:].strip()
+        
+        if remaining:
+            parts.append(remaining)
+        
+        return parts
 
     async def _extract_and_store_memories(
         self, user_id: str, user_message: str, bot_response: str

@@ -62,7 +62,9 @@ class TestToolManagerMCPIntegration(unittest.TestCase):
         
     def test_mcp_tools_registered(self):
         """Test that MCP memory tools are registered"""
+        # remember_user_mcp is an alias for remember_user_info
         self.assertIn("remember_user_mcp", self.tool_manager.tools)
+        self.assertIn("remember_user_info", self.tool_manager.tools)
         self.assertIn("search_user_memory", self.tool_manager.tools)
         
     def test_mcp_tools_in_available_tools(self):
@@ -70,21 +72,28 @@ class TestToolManagerMCPIntegration(unittest.TestCase):
         available_tools = self.tool_manager.get_available_tools()
         tool_names = [tool["function"]["name"] for tool in available_tools]
         
-        self.assertIn("remember_user_mcp", tool_names)
+        # remember_user_info is the primary tool (remember_user_mcp is an alias)
+        self.assertIn("remember_user_info", tool_names)
         self.assertIn("search_user_memory", tool_names)
         
     @patch('config.MCP_MEMORY_ENABLED', False)
-    def test_remember_user_mcp_disabled(self):
-        """Test remember_user_mcp when MCP is disabled"""
-        result = self.tool_manager.remember_user_mcp("user123", "preferences", "likes crypto")
+    def test_remember_user_info_disabled(self):
+        """Test remember_user_info when MCP is disabled"""
+        # remember_user_mcp is an alias for remember_user_info in the tools dict
+        result = self.tool_manager.remember_user_info("user123", "preferences", "likes crypto")
         # Should fallback to SQLite when MCP is disabled
         self.assertIn("Got it! I'll remember that", result)
         
-    @patch('tools.tool_manager.MCP_MEMORY_ENABLED', False)
-    def test_search_user_memory_disabled(self):
-        """Test search_user_memory when MCP is disabled"""
-        result = self.tool_manager.search_user_memory("user123", "crypto")
-        self.assertIn("MCP memory server is not enabled", result)
+    def test_search_user_memory_finds_stored_memory(self):
+        """Test search_user_memory finds previously stored memory"""
+        # First store a memory
+        self.tool_manager.remember_user_info("test_user_search", "preferences", "likes crypto trading")
+        
+        # Now search for it
+        result = self.tool_manager.search_user_memory("test_user_search", "crypto")
+        # Should find the memory we just stored
+        self.assertIn("Found", result)
+        self.assertIn("crypto", result.lower())
 
 
 class TestMCPMemoryIntegration(unittest.TestCase):

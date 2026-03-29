@@ -229,11 +229,41 @@ class DiscordTools:
                 logger.error(f"Unexpected error reading message history in channel {channel_id}: {e}")
                 return {"error": f"Failed to read message history: {str(e)}"}
 
+            def _embed_text(embed) -> str:
+                """Concatenate all searchable text fields from an embed."""
+                parts = []
+                if embed.title:
+                    parts.append(embed.title)
+                if embed.description:
+                    parts.append(embed.description)
+                if embed.url:
+                    parts.append(embed.url)
+                if embed.author and embed.author.name:
+                    parts.append(embed.author.name)
+                if embed.footer and embed.footer.text:
+                    parts.append(embed.footer.text)
+                for field in embed.fields:
+                    if field.name:
+                        parts.append(field.name)
+                    if field.value:
+                        parts.append(field.value)
+                return " ".join(parts)
+
+            def _message_matches_query(message, query: str) -> bool:
+                """Return True if the query matches message content or any embed text."""
+                q = query.lower()
+                if q in message.content.lower():
+                    return True
+                for embed in message.embeds:
+                    if q in _embed_text(embed).lower():
+                        return True
+                return False
+
             # Filter messages
             filtered_messages = []
             for message in messages:
-                # Filter by query if provided
-                if query and query.lower() not in message.content.lower():
+                # Filter by query if provided (checks content + embed text)
+                if query and not _message_matches_query(message, query):
                     continue
 
                 # Filter by author if provided
@@ -245,6 +275,26 @@ class DiscordTools:
             # Format messages
             formatted_messages = []
             for message in reversed(filtered_messages):  # Reverse to get chronological order
+                formatted_embeds = []
+                for embed in message.embeds:
+                    embed_data = {}
+                    if embed.title:
+                        embed_data["title"] = embed.title
+                    if embed.description:
+                        embed_data["description"] = embed.description
+                    if embed.url:
+                        embed_data["url"] = embed.url
+                    if embed.author and embed.author.name:
+                        embed_data["author"] = embed.author.name
+                    if embed.footer and embed.footer.text:
+                        embed_data["footer"] = embed.footer.text
+                    if embed.fields:
+                        embed_data["fields"] = [
+                            {"name": f.name, "value": f.value} for f in embed.fields
+                        ]
+                    if embed_data:
+                        formatted_embeds.append(embed_data)
+
                 message_info = {
                     "id": str(message.id),
                     "content": message.content,
@@ -258,7 +308,7 @@ class DiscordTools:
                     "timestamp": message.created_at.isoformat(),
                     "edited_timestamp": message.edited_at.isoformat() if message.edited_at else None,
                     "attachments": [str(att.url) for att in message.attachments],
-                    "embeds": len(message.embeds),
+                    "embeds": formatted_embeds,
                     "mentions": [str(mention.id) for mention in message.mentions],
                     "channel_id": str(message.channel.id),
                     "guild_id": str(message.guild.id) if message.guild else None

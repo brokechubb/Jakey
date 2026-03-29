@@ -600,28 +600,23 @@ class ToolManager:
                 "type": "function",
                 "function": {
                     "name": "generate_image",
-                    "description": "Generate an image using Arta API with artistic styles and aspect ratios",
+                    "description": "Generate an image using Arta API. Choose a style that matches the user's request.",
                     "parameters": {
                         "type": "object",
                         "properties": {
                             "prompt": {
                                 "type": "string",
-                                "description": "Image generation prompt",
+                                "description": "Image generation prompt describing what to create",
                             },
-                            "model": {
+                            "style": {
                                 "type": "string",
-                                "description": "Model to use for generation",
+                                "description": "Artistic style. Options: Fantasy Art, Cinematic Art, Surrealism, Vincent Van Gogh, Photographic, Professional, Epicrealism-xl, Anime tattoo, Kawaii, Graffiti, Death metal, Flame design, Black Ink, Flux, High GPT4o, Realistic tattoo, Old School, New School, Neo-traditional, Chicano, Dotwork, Embroidery tattoo, Japanese_2, Watercolor, Low Poly, Trash Polka, Medieval, Biomech, SDXL 1.0, SDXL L, No Style, Juggernaut-xl, Dreamshaper-xl, RevAnimated, Katayama-mix-xl, Cor-epica-xl, Playground-xl, Anything-xl, Pony-xl, Yamers-realistic-xl, Realistic-stock-xl, Cheyenne-xl, F Dev, F Pro, Mini tattoo, Old school colored, Red and Black, On limbs black. Default: SDXL 1.0",
                                 "default": "SDXL 1.0",
                             },
-                            "width": {
-                                "type": "integer",
-                                "description": "Image width in pixels (converted to aspect ratio)",
-                                "default": 1024,
-                            },
-                            "height": {
-                                "type": "integer",
-                                "description": "Image height in pixels (converted to aspect ratio)",
-                                "default": 1024,
+                            "ratio": {
+                                "type": "string",
+                                "description": "Aspect ratio. Options: 1:1 (square), 16:9 (widescreen), 9:16 (portrait), 3:2, 2:3, 4:3, 3:4, 21:9 (ultrawide), 9:21. Default: 1:1",
+                                "default": "1:1",
                             },
                         },
                         "required": ["prompt"],
@@ -1967,11 +1962,7 @@ class ToolManager:
             return f"Unexpected error during URL crawling: {str(e)}"
 
     def generate_image(
-        self,
-        prompt: str,
-        model: str = "SDXL 1.0",
-        width: int = 1024,
-        height: int = 1024,
+        self, prompt: str, style: str = "SDXL 1.0", ratio: str = "1:1"
     ) -> str:
         """Generate an image using Arta API with rate limiting"""
         if not self._check_rate_limit("generate_image"):
@@ -1981,9 +1972,23 @@ class ToolManager:
             # Import image generator here to avoid circular imports
             from media.image_generator import image_generator
 
+            # Map ratio to width/height for backward compatibility
+            ratio_to_dims = {
+                "1:1": (1024, 1024),
+                "16:9": (1920, 1080),
+                "9:16": (1080, 1920),
+                "3:2": (1536, 1024),
+                "2:3": (1024, 1536),
+                "4:3": (1365, 1024),
+                "3:4": (1024, 1365),
+                "21:9": (2240, 960),
+                "9:21": (960, 2240),
+            }
+            width, height = ratio_to_dims.get(ratio, (1024, 1024))
+
             # Generate the image
             image_url = image_generator.generate_image(
-                prompt=prompt, model=model, width=width, height=height
+                prompt=prompt, model=style, width=width, height=height
             )
 
             return image_url
@@ -2474,11 +2479,37 @@ class ToolManager:
             response += f"Guild: {channel_info['guild_name']}\n"
             response += f"Messages ({result['count']} total):\n\n"
 
+            # Detect channels that are pure bot-notification spam with no readable content.
+            # This typically happens when a bot posts only role pings and its embed data
+            # is not returned by the Discord history API for user accounts.
+            substantive_count = sum(
+                1 for m in messages
+                if m.get("content", "").strip()
+                and not m.get("content", "").strip().startswith("<@")
+                or m.get("attachments")
+                or (isinstance(m.get("embeds"), list) and any(m.get("embeds")))
+            )
+            if messages and substantive_count == 0:
+                response += (
+                    "[NOTE] All messages in this channel are bot notifications containing "
+                    "only role pings (e.g. <@&...>) with no readable text or embed content. "
+                    "The actual content (e.g. codes, announcements) is stored in Discord embeds "
+                    "that are not accessible via the message history API for user accounts. "
+                    "There is nothing useful to extract from this channel.\n\n"
+                )
+
             for message in messages:
                 timestamp = message["timestamp"].split("T")[0]  # Just the date part
                 response += f"[{timestamp}] {message['author']['username']}: {message['content']}\n"
                 if message["attachments"]:
                     response += f"  Attachments: {', '.join(message['attachments'])}\n"
+                embed_list = message.get("embeds")
+                if isinstance(embed_list, list) and embed_list:
+                    for embed in embed_list:
+                        if isinstance(embed, dict) and embed:
+                            response += f"  Embed: {embed}\n"
+                elif isinstance(embed_list, int) and embed_list:
+                    response += f"  [embed content not available]\n"
                 response += "\n"
 
             logger.info(

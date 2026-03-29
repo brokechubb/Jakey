@@ -303,26 +303,21 @@ class TestPerformanceTracking(unittest.TestCase):
             "provider2": {"success_rate": 0.90, "average_response_time": 0.2},
             "provider3": {"success_rate": 0.85, "average_response_time": 0.15}
         }
-        
+
         # Calculate performance score
-def calculate_score(perf):
-                return (perf["success_rate"] * 100) - (perf["avg_response_time"] * 10)
-            
-            scores = {
-                name: calculate_score(perf) 
-                for name, perf in provider_performance.items()
-            }
-            
-            best_provider_name = max(scores.keys(), key=lambda x: scores[x])
-            best_provider = fast_provider if best_provider_name == "fast" else slow_provider
-            
-            # Make request with best provider
-            result = await best_provider.generate_text([{"role": "user", "content": "test"}])
-            
-            self.assertEqual(result["content"], "Response from fast")
-            self.assertEqual(best_provider_name, "fast")
-        
-        asyncio.run(test_performance_routing())
+        def calculate_score(stats):
+            return (stats["success_rate"] * 100) - (stats["average_response_time"] * 10)
+
+        scores = {
+            name: calculate_score(stats)
+            for name, stats in provider_stats.items()
+        }
+
+        # Provider with highest success_rate and lowest response_time should win
+        best_provider_name = max(scores.keys(), key=lambda x: scores[x])
+
+        # provider1 should win: 0.95*100 - 0.1*10 = 94
+        self.assertEqual(best_provider_name, "provider1")
 
 
 if __name__ == "__main__":
