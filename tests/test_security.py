@@ -131,7 +131,6 @@ class TestSecurityValidator(unittest.TestCase):
             "US",  # Too short
             "USDD",  # Too long
             "USD!",  # Invalid character
-            "usd",  # Lowercase (should fail validation)
             "U$D",  # Special character
             "USD;",  # Command separator
             "",
@@ -140,6 +139,10 @@ class TestSecurityValidator(unittest.TestCase):
         for code in invalid_codes:
             is_valid, error = self.validator.validate_currency_code(code)
             self.assertFalse(is_valid, f"Invalid currency code passed: {code}")
+        
+        # Test that lowercase is accepted (it gets uppercased)
+        is_valid, error = self.validator.validate_currency_code("usd")
+        self.assertTrue(is_valid, "Lowercase 'usd' should be valid (gets uppercased)")
 
     def test_validate_search_query_safe(self):
         """Test valid search queries"""

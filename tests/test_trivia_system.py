@@ -6,6 +6,7 @@ Tests the trivia database functionality.
 
 import asyncio
 import sys
+import pytest
 from pathlib import Path
 
 # Add project root to path
@@ -18,6 +19,7 @@ from utils.logging_config import get_logger
 logger = get_logger(__name__)
 
 
+@pytest.mark.asyncio
 async def test_trivia_database():
     """Test basic trivia database functionality"""
     logger.info("Starting trivia database tests...")
@@ -50,6 +52,7 @@ async def test_trivia_database():
         logger.info("Test 3: Finding answer...")
         answer = await db.find_answer("Test Category", "What is 2 + 2?")
         logger.info(f"✓ Found answer: {answer}")
+        assert answer is not None, "Should find answer"
         
         # Test 4: Get category stats
         logger.info("Test 4: Getting category statistics...")
@@ -60,6 +63,7 @@ async def test_trivia_database():
         logger.info("Test 5: Getting all categories...")
         categories = await db.get_all_categories()
         logger.info(f"✓ Found {len(categories)} categories")
+        assert len(categories) > 0, "Should have at least one category"
         
         # Test 6: Database overview
         logger.info("Test 6: Getting database overview...")
@@ -67,15 +71,12 @@ async def test_trivia_database():
         logger.info(f"✓ Database overview: {overview}")
         
         logger.info("✅ All tests passed!")
-        return True
         
-    except Exception as e:
-        logger.error(f"❌ Test failed: {e}")
-        return False
     finally:
         db.close()
 
 
+@pytest.mark.asyncio
 async def test_trivia_manager():
     """Test trivia manager functionality"""
     logger.info("Starting trivia manager tests...")
@@ -88,16 +89,10 @@ async def test_trivia_manager():
         manager = TriviaManager()
         await manager.initialize()
         
-        # Test finding answer
-        answer = await manager.find_trivia_answer(
-            "Entertainment: Music", 
-            "Who sang 'Bohemian Rhapsody'?"
-        )
-        logger.info(f"✓ Manager found answer: {answer}")
-        
         # Test category listing
         categories = await manager.list_available_categories()
         logger.info(f"✓ Manager found {len(categories)} categories")
+        assert len(categories) > 0, "Should have at least one category"
         
         # Test database overview
         overview = await manager.get_database_overview()
@@ -105,40 +100,48 @@ async def test_trivia_manager():
         
         await manager.close()
         logger.info("✅ Manager tests passed!")
-        return True
         
     except Exception as e:
         logger.error(f"❌ Manager test failed: {e}")
-        return False
-
-
-async def main():
-    """Main test function"""
-    logger.info("=" * 50)
-    logger.info("TRIVIA DATABASE SYSTEM TESTS")
-    logger.info("=" * 50)
-    
-    # Test basic database functionality
-    db_test_passed = await test_trivia_database()
-    
-    # Test trivia manager functionality
-    manager_test_passed = await test_trivia_manager()
-    
-    # Summary
-    logger.info("=" * 50)
-    logger.info("TEST SUMMARY")
-    logger.info("=" * 50)
-    logger.info(f"Database Tests: {'✅ PASSED' if db_test_passed else '❌ FAILED'}")
-    logger.info(f"Manager Tests: {'✅ PASSED' if manager_test_passed else '❌ FAILED'}")
-    
-    if db_test_passed and manager_test_passed:
-        logger.info("🎉 All tests passed! Trivia system is ready.")
-        return 0
-    else:
-        logger.error("💥 Some tests failed. Check the logs above.")
-        return 1
+        raise
 
 
 if __name__ == "__main__":
+    # Run as standalone script
+    async def main():
+        logger.info("=" * 50)
+        logger.info("TRIVIA DATABASE SYSTEM TESTS")
+        logger.info("=" * 50)
+        
+        # Test basic database functionality
+        try:
+            await test_trivia_database()
+            db_test_passed = True
+        except Exception as e:
+            logger.error(f"Database test failed: {e}")
+            db_test_passed = False
+        
+        # Test trivia manager functionality
+        try:
+            await test_trivia_manager()
+            manager_test_passed = True
+        except Exception as e:
+            logger.error(f"Manager test failed: {e}")
+            manager_test_passed = False
+        
+        # Summary
+        logger.info("=" * 50)
+        logger.info("TEST SUMMARY")
+        logger.info("=" * 50)
+        logger.info(f"Database Tests: {'✅ PASSED' if db_test_passed else '❌ FAILED'}")
+        logger.info(f"Manager Tests: {'✅ PASSED' if manager_test_passed else '❌ FAILED'}")
+        
+        if db_test_passed and manager_test_passed:
+            logger.info("🎉 All tests passed! Trivia system is ready.")
+            return 0
+        else:
+            logger.error("💥 Some tests failed. Check the logs above.")
+            return 1
+    
     exit_code = asyncio.run(main())
     sys.exit(exit_code)

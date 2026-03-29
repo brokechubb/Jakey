@@ -80,11 +80,11 @@ class TestCommands(unittest.TestCase):
         # Verify it has a docstring
         self.assertIsNotNone(setup_commands.__doc__)
 
-        # Verify it takes one parameter (bot_instance)
+        # Verify it takes one parameter (bot)
         sig = inspect.signature(setup_commands)
         params = list(sig.parameters.keys())
         self.assertEqual(len(params), 1)
-        self.assertEqual(params[0], 'bot_instance')
+        self.assertEqual(params[0], 'bot')
 
 if __name__ == '__main__':
     unittest.main()
