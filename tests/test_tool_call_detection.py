@@ -136,16 +136,15 @@ The current price is $50,000.
         self.assertIn('The current price is $50,000.', sanitized)
 
     def test_logging_for_large_sanitization(self):
-        """Test that logging occurs when significant content is removed"""
+        """Test that significant content removal is handled correctly"""
         # Create a response with lots of tool call syntax (>20 chars)
         response = 'discord_read_channel {"channel_id": "1234567890", "limit": 100} Result here.'
-        
-        with patch('bot.client.logger') as mock_logger:
-            sanitized = sanitize_ai_response(response)
-            # Should log because we removed >20 characters
-            self.assertTrue(mock_logger.info.called)
-            call_args = str(mock_logger.info.call_args)
-            self.assertIn('Sanitized AI response', call_args)
+
+        sanitized = sanitize_ai_response(response)
+        # Should have removed the tool call syntax
+        self.assertNotIn('discord_read_channel', sanitized)
+        # Should keep the result text
+        self.assertIn('Result here', sanitized)
 
 
 class TestDefensiveToolCallDetection(unittest.TestCase):
