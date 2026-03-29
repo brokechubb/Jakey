@@ -6,6 +6,8 @@ Handles all FatTips API interactions including tipping, wallet management, airdr
 import aiohttp
 import asyncio
 import os
+import time
+import random
 from typing import Optional, Dict, List, Any
 from datetime import datetime
 import logging
@@ -260,10 +262,10 @@ class FatTipsManager:
             logger.error(f"Failed to log transaction: {e}")
 
     async def send_tip(
-        self, 
-        from_discord_id: str, 
-        to_discord_id: str, 
-        amount: float, 
+        self,
+        from_discord_id: str,
+        to_discord_id: str,
+        amount: float,
         token: str = "SOL",
         amount_type: str = "token"
     ) -> Dict[str, Any]:
@@ -280,6 +282,16 @@ class FatTipsManager:
             result_with_amount = result.copy()
             result_with_amount['amount'] = amount
             self._log_transaction("TIP", result_with_amount)
+            
+            # Check if Jakey is the recipient and send acknowledgment
+            if to_discord_id == self.jakey_discord_id and self.bot:
+                await self._send_tip_received_acknowledgment(
+                    from_discord_id, 
+                    amount, 
+                    token.upper(), 
+                    result.get('amountUsd', 0)
+                )
+        
         return result
 
     async def send_batch_tip(
@@ -302,6 +314,19 @@ class FatTipsManager:
         result = await self._make_request("POST", "/api/send/batch-tip", data=data, operation="send_batch_tip")
         if "error" not in result:
             self._log_transaction("BATCH_TIP", result)
+            
+            # Check if Jakey is one of the recipients and send acknowledgment
+            if self.jakey_discord_id in recipients and self.bot:
+                # Calculate per-recipient amount
+                per_recipient = total_amount / len(recipients)
+                usd_per_recipient = result.get('totalAmountUsd', 0) / len(recipients)
+                await self._send_tip_received_acknowledgment(
+                    from_discord_id, 
+                    per_recipient, 
+                    token.upper(), 
+                    usd_per_recipient
+                )
+        
         return result
 
     async def withdraw(
@@ -627,6 +652,59 @@ class FatTipsManager:
             logger.warning("=" * 60)
         
         return {"success": True, "wallet": new_wallet, "created": True}
+    async def _send_tip_received_acknowledgment(
+        self, 
+        sender_id: str, 
+        amount: float, 
+        currency: str, 
+        usd_value: float
+    ):
+        """Send acknowledgment when Jakey receives a tip via FatTips"""
+        try:
+            from config import TIP_THANK_YOU_ENABLED, TIP_THANK_YOU_MESSAGES, TIP_THANK_YOU_EMOJIS, TIP_THANK_YOU_COOLDOWN
+            
+            if not TIP_THANK_YOU_ENABLED:
+                return
+            
+            # Rate limit acknowledgment (use bot's thank_you_cooldown if available)
+            if hasattr(self.bot, 'tipcc_manager') and hasattr(self.bot.tipcc_manager, 'thank_you_cooldown'):
+                current_time = time.time()
+                if sender_id in self.bot.tipcc_manager.thank_you_cooldown:
+                    if current_time - self.bot.tipcc_manager.thank_you_cooldown[sender_id] < TIP_THANK_YOU_COOLDOWN:
+                        logger.debug(f"FatTips tip acknowledgment on cooldown for user {sender_id}")
+                        return
+                self.bot.tipcc_manager.thank_you_cooldown[sender_id] = current_time
+            
+            # Select random thank you message
+            thank_you_message = random.choice(TIP_THANK_YOU_MESSAGES)
+            thank_you_emoji = random.choice(TIP_THANK_YOU_EMOJIS)
+            
+            response = f"<@{sender_id}> {thank_you_message} {thank_you_emoji}"
+            
+            # Find a suitable channel
+            if not self.bot:
+                return
+            
+            target_channel = None
+            for guild in self.bot.guilds:
+                member = guild.get_member(int(sender_id))
+                if member and self.bot.user and member != self.bot.user:
+                    for channel in guild.text_channels:
+                        if (channel.permissions_for(guild.me).send_messages and
+                            channel.permissions_for(member).view_channel):
+                            target_channel = channel
+                            break
+                    if target_channel:
+                        break
+            
+            if target_channel:
+                await target_channel.send(response)
+                logger.info(f"Sent FatTips tip acknowledgment to user {sender_id} for {amount} {currency}")
+            else:
+                logger.warning(f"Could not find channel to send FatTips tip acknowledgment to user {sender_id}")
+        
+        except Exception as e:
+            logger.error(f"Error sending FatTips tip acknowledgment: {e}")
     
     async def get_jakey_balance(self, use_cache: bool = True) -> Dict[str, Any]:
         """Get Jakey's FatTips balance with caching"""
