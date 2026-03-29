@@ -110,10 +110,15 @@ FATTIPS_JAKEY_DISCORD_ID = os.getenv("FATTIPS_JAKEY_DISCORD_ID", "")
 
 # Trivia Tip Configuration
 TRIVIA_TIP_ENABLED = os.getenv("TRIVIA_TIP_ENABLED", "false").lower() == "true"
-TRIVIA_TIP_AMOUNT = float(os.getenv("TRIVIA_TIP_AMOUNT") or "0.05")  # Tip amount in USD
+TRIVIA_TIP_AMOUNT = float(os.getenv("TRIVIA_TIP_AMOUNT") or "0.05")  # Tip amount per correct answer in USD
 TRIVIA_TIP_TOKEN = os.getenv(
     "TRIVIA_TIP_TOKEN", "SOL"
 )  # Token to tip (SOL, USDC, USDT)
+
+# Trivia Session Winner Bonus Tip (tipped to overall winner at end of multi-round session)
+TRIVIA_SESSION_WINNER_TIP_ENABLED = os.getenv("TRIVIA_SESSION_WINNER_TIP_ENABLED", "false").lower() == "true"
+TRIVIA_SESSION_WINNER_TIP_AMOUNT = float(os.getenv("TRIVIA_SESSION_WINNER_TIP_AMOUNT") or "0.10")  # Bonus for session winner in USD
+TRIVIA_SESSION_WINNER_TIP_TOKEN = os.getenv("TRIVIA_SESSION_WINNER_TIP_TOKEN", "SOL")  # Token for session winner bonus
 
 # Airdrop Configuration
 AIRDROP_PRESENCE = os.getenv("AIRDROP_PRESENCE", "invisible")

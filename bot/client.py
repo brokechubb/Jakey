@@ -6324,6 +6324,9 @@ class JakeyBot(commands.Bot):
             scoreboard = f"\n🏆 **TRIVIA SESSION COMPLETE!** 🏆\n"
             scoreboard += f"📊 **{total_rounds} rounds played**\n\n"
 
+            session_winner_id = None
+            session_winner_wins = 0
+
             if scores:
                 # Sort by score descending
                 sorted_scores = sorted(scores.items(), key=lambda x: x[1], reverse=True)
@@ -6331,6 +6334,10 @@ class JakeyBot(commands.Bot):
                 for rank, (user_id, wins) in enumerate(sorted_scores, 1):
                     medal = "🥇" if rank == 1 else "🥈" if rank == 2 else "🥉" if rank == 3 else "  "
                     scoreboard += f"{medal} <@{user_id}> - {wins} wins\n"
+                    # Track the overall winner (first place)
+                    if rank == 1:
+                        session_winner_id = user_id
+                        session_winner_wins = wins
             else:
                 scoreboard += "No correct answers this session 😅\n"
 
@@ -6342,7 +6349,50 @@ class JakeyBot(commands.Bot):
                 else:
                     scoreboard += f"Round {i}: ⏰ Timed out\n"
 
-            scoreboard += f"\nWant to play again? Just ask for another trivia session!"
+            # Tip the session winner if enabled and there's a winner
+            if session_winner_id and session_winner_wins > 0:
+                try:
+                    from config import (
+                        TRIVIA_SESSION_WINNER_TIP_ENABLED,
+                        TRIVIA_SESSION_WINNER_TIP_AMOUNT,
+                        TRIVIA_SESSION_WINNER_TIP_TOKEN,
+                        FATTIPS_ENABLED,
+                        FATTIPS_JAKEY_DISCORD_ID
+                    )
+                    if (TRIVIA_SESSION_WINNER_TIP_ENABLED and FATTIPS_ENABLED and FATTIPS_JAKEY_DISCORD_ID):
+                        from utils.fattips_manager import get_fattips_manager
+                        manager = get_fattips_manager()
+                        
+                        # Check Jakey's balance first
+                        balance_result = await manager.get_balance(FATTIPS_JAKEY_DISCORD_ID)
+                        if "error" not in balance_result:
+                            # Check if we have enough SOL (or the configured token)
+                            available = balance_result.get(TRIVIA_SESSION_WINNER_TIP_TOKEN.lower(), 0)
+                            # Rough conversion: $0.10 ≈ 0.0007 SOL (adjust based on current prices)
+                            min_required = 0.0001 if TRIVIA_SESSION_WINNER_TIP_TOKEN == "SOL" else 0.01
+                            
+                            if available >= min_required:
+                                tip_result = await manager.send_tip(
+                                    FATTIPS_JAKEY_DISCORD_ID,
+                                    session_winner_id,
+                                    TRIVIA_SESSION_WINNER_TIP_AMOUNT,
+                                    TRIVIA_SESSION_WINNER_TIP_TOKEN,
+                                    "usd"
+                                )
+                                if "error" not in tip_result:
+                                    scoreboard += f"\n🎉 **Session Winner Bonus!** <@{session_winner_id}> gets an extra {tip_result.get('amountToken', TRIVIA_SESSION_WINNER_TIP_AMOUNT):.4f} {TRIVIA_SESSION_WINNER_TIP_TOKEN} (~${TRIVIA_SESSION_WINNER_TIP_AMOUNT:.2f})!"
+                                    logger.info(f"Session winner tip sent to {session_winner_id}: {TRIVIA_SESSION_WINNER_TIP_AMOUNT} USD in {TRIVIA_SESSION_WINNER_TIP_TOKEN}")
+                                else:
+                                    logger.warning(f"Session winner tip failed: {tip_result.get('error')}")
+                            else:
+                                scoreboard += f"\n💸 *Session winner bonus skipped - Jakey's wallet is empty!*"
+                                logger.info(f"Skipped session winner tip: insufficient {TRIVIA_SESSION_WINNER_TIP_TOKEN} balance")
+                        else:
+                            logger.warning(f"Failed to check balance for session winner tip: {balance_result.get('error')}")
+                except Exception as tip_error:
+                    logger.error(f"Error sending session winner tip: {tip_error}")
+
+            scoreboard += f"\n\nWant to play again? Just ask for another trivia session!"
 
             # Send scoreboard
             channel = self.get_channel(int(channel_id))
