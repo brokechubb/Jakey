@@ -46,6 +46,15 @@ TOOL_CALL_TAG_PATTERN = re.compile(r"</?tool_call>.*", re.DOTALL | re.IGNORECASE
 FUNCTION_CALL_TAG_PATTERN = re.compile(
     r"</?function_call>.*", re.DOTALL | re.IGNORECASE
 )
+# XML-style tool call patterns (e.g., <function_calls><invoke name="..."><parameter name="...">...</parameter></invoke></function_calls>)
+XML_FUNCTION_CALLS_PATTERN = re.compile(
+    r"<function_calls>\s*<invoke\s+name=[\"']([^\"']+)[\"']>\s*(.*?)\s*</invoke>\s*</function_calls>",
+    re.DOTALL | re.IGNORECASE,
+)
+XML_PARAMETER_PATTERN = re.compile(
+    r"<parameter\s+name=[\"']([^\"']+)[\"']\s*>([^<]*)</parameter>",
+    re.DOTALL | re.IGNORECASE,
+)
 
 # Thinking/reasoning block patterns that should be stripped from responses
 # These are internal chain-of-thought that shouldn't be shown to users
@@ -162,6 +171,54 @@ def extract_text_tool_calls(ai_response: str) -> Tuple[List[Dict], str]:
         cleaned_response = TOOL_CALL_JSON_PATTERN.sub("", cleaned_response).strip()
 
         # If we found any JSON tool calls, return them
+        if all_tool_calls:
+            return all_tool_calls, cleaned_response
+
+    # Try XML-style format (e.g., <function_calls><invoke name="..."><parameter name="...">...</parameter></invoke></function_calls>)
+    xml_matches = list(XML_FUNCTION_CALLS_PATTERN.finditer(ai_response))
+    if xml_matches:
+        for match in xml_matches:
+            try:
+                function_name = match.group(1)
+                parameters_block = match.group(2)
+
+                # Validate that function name exists in available tools
+                if function_name not in valid_tool_names:
+                    logging.getLogger(__name__).debug(
+                        f"Extracted function '{function_name}' not in valid tools, ignoring"
+                    )
+                    continue
+
+                # Parse parameters from XML format
+                parameters = {}
+                param_matches = XML_PARAMETER_PATTERN.findall(parameters_block)
+                for param_name, param_value in param_matches:
+                    param_value = param_value.strip()
+                    # Try to convert to appropriate type
+                    try:
+                        if "." in param_value:
+                            parameters[param_name] = float(param_value)
+                        else:
+                            parameters[param_name] = int(param_value)
+                    except ValueError:
+                        parameters[param_name] = param_value
+
+                tool_call = {
+                    "id": f"manual_{int(time.time())}_{len(all_tool_calls)}",
+                    "type": "function",
+                    "function": {"name": function_name, "arguments": parameters},
+                }
+                all_tool_calls.append(tool_call)
+            except Exception as e:
+                logging.getLogger(__name__).debug(
+                    f"Failed to parse XML tool call: {e}"
+                )
+                continue
+
+        # Remove ALL XML tool calls from response
+        cleaned_response = XML_FUNCTION_CALLS_PATTERN.sub("", cleaned_response).strip()
+
+        # If we found any XML tool calls, return them
         if all_tool_calls:
             return all_tool_calls, cleaned_response
 
