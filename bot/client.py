@@ -1511,13 +1511,44 @@ class JakeyBot(commands.Bot):
                                 return  # Don't process as regular message
                         elif game_ended:
                             # Game timed out while checking
-                            await message.channel.send(
-                                f"⏰ **Time's up!** The correct answer was: **{correct_answer}**\n"
-                                f"Better luck next time!"
-                            )
-                            logger.info(
-                                f"Trivia game timed out during answer check in channel {channel_id}"
-                            )
+                            # Check if this is part of a multi-round session
+                            session = getattr(self.tool_manager, "_trivia_sessions", {}).get(channel_id)
+                            if session:
+                                # Update session state - no winner for this round
+                                session["rounds_completed"] += 1
+                                session["round_winners"].append(None)  # None indicates timeout
+
+                                if session["rounds_completed"] < session["total_rounds"]:
+                                    # More rounds to go
+                                    next_round = session["rounds_completed"] + 1
+                                    await message.channel.send(
+                                        f"⏰ **Time's up!** The correct answer was: **{correct_answer}**\n"
+                                        f"📊 **Round {session['rounds_completed']} of {session['total_rounds']}** - No winner\n"
+                                        f"Round {next_round} in 8 seconds..."
+                                    )
+                                    logger.info(
+                                        f"Trivia round {session['rounds_completed']} timed out in channel {channel_id}, advancing to round {next_round}"
+                                    )
+                                    # Schedule next round
+                                    asyncio.create_task(self._advance_trivia_round(channel_id))
+                                    return
+                                else:
+                                    # Session complete - show scoreboard
+                                    await message.channel.send(
+                                        f"⏰ **Time's up!** The correct answer was: **{correct_answer}**\n"
+                                        f"📊 **Final Round!** Session complete!"
+                                    )
+                                    await self._finish_trivia_session(channel_id)
+                                    return
+                            else:
+                                # Single question mode
+                                await message.channel.send(
+                                    f"⏰ **Time's up!** The correct answer was: **{correct_answer}**\n"
+                                    f"Better luck next time!"
+                                )
+                                logger.info(
+                                    f"Trivia game timed out during answer check in channel {channel_id}"
+                                )
                             return  # Don't process as regular message
                         # If not correct and game not ended, silently continue
                         # (let users keep guessing without feedback on wrong answers)
