@@ -112,6 +112,16 @@ SPECIAL_TOKEN_PATTERN = re.compile(
     r"<\|tool_call_end\|>|<\|tool_calls_section_end\|>|<\|tool_calls_section\|>|<\|tool_call_start\|>|<\|[^|>]+\|>",
     re.IGNORECASE,
 )
+STRUCTURED_CONTENT_PATTERN = re.compile(
+    r"\[\s*\{\s*['\"]type['\"]\s*:\s*['\"]text['\"]\s*,\s*['\"]text['\"]\s*:\s*[\"']",
+    re.DOTALL | re.IGNORECASE,
+)
+STRUCTURED_CONTENT_EXTRACT = re.compile(
+    r"\[\s*\{\s*['\"]type['\"]\s*:\s*['\"]text['\"]\s*,\s*['\"]text['\"]\s*:\s*[\"']"
+    + r"(.*?)" 
+    + r"[\"']\s*\}\s*\]",
+    re.DOTALL | re.IGNORECASE,
+)
 
 
 def extract_text_tool_calls(ai_response: str) -> Tuple[List[Dict], str]:
@@ -126,6 +136,16 @@ def extract_text_tool_calls(ai_response: str) -> Tuple[List[Dict], str]:
     """
     if not ai_response:
         return [], ai_response
+
+    unwrapped = False
+    structured_match = STRUCTURED_CONTENT_EXTRACT.match(ai_response)
+    if not structured_match:
+        structured_match = STRUCTURED_CONTENT_EXTRACT.search(ai_response)
+    if structured_match:
+        inner_text = structured_match.group(1)
+        logger.info("Unwrapped structured content format [{'type': 'text', ...}] from AI response")
+        ai_response = ai_response[:structured_match.start()] + inner_text + ai_response[structured_match.end():]
+        unwrapped = True
 
     # Get list of valid tool names to validate extractions
     from tools.tool_manager import tool_manager
@@ -410,6 +430,15 @@ def sanitize_ai_response(response: str) -> str:
 
     # Remove JSON-formatted tool calls: {"type": "function", "name": "...", "parameters": {...}}
     sanitized = JSON_TOOL_CALL_PATTERN.sub("", sanitized)
+
+    # Remove structured content wrapper: [{'type': 'text', 'text': "..."}] -> extract inner text
+    structured_match = STRUCTURED_CONTENT_EXTRACT.match(sanitized)
+    if not structured_match:
+        structured_match = STRUCTURED_CONTENT_EXTRACT.search(sanitized)
+    if structured_match:
+        inner_text = structured_match.group(1)
+        sanitized = sanitized[:structured_match.start()] + inner_text + sanitized[structured_match.end():]
+        logger.info("Sanitized structured content wrapper from AI response")
 
     # Remove trailing </s> tokens some models add
     sanitized = END_TOKEN_PATTERN.sub("", sanitized)
