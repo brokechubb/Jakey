@@ -998,7 +998,7 @@ class DiscordTools:
              logger.error(f"Error deleting message: {e}")
              return {"error": f"Failed to delete message: {str(e)}"}
 
-async def get_active_users_in_channel(
+    async def get_active_users_in_channel(
         self, channel_id: str, limit: int = 50, max_users: int = 10, exclude_bots: bool = True
     ) -> Dict[str, Any]:
         """
