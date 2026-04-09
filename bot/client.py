@@ -2338,6 +2338,8 @@ class JakeyBot(commands.Bot):
                                 },
                                 "fattips_create_rain": {
                                     "user_id": "creator_id",
+                                    "num_users": "number_of_users",
+                                    "users": "number_of_users",
                                 },
                                 "fattips_claim_airdrop": {
                                     "user_id": "claimant_id",
@@ -2348,6 +2350,13 @@ class JakeyBot(commands.Bot):
                                 if wrong_name in arguments:
                                     arguments[correct_name] = arguments.pop(wrong_name)
                                     logger.info(f"Normalized parameter '{wrong_name}' -> '{correct_name}' for {function_name}")
+
+                            # Auto-inject channel_id for FatTips tools if not provided
+                            # This ensures announcements are sent in the channel where tip was requested
+                            fattips_channel_tools = ["fattips_send_tip", "fattips_create_rain"]
+                            if function_name in fattips_channel_tools and "channel_id" not in arguments:
+                                arguments["channel_id"] = str(message.channel.id)
+                                logger.info(f"Auto-injected channel_id={arguments['channel_id']} for {function_name}")
 
                             # Validate required parameters for common tools
                             # If model sent empty args for a tool that needs params, skip it
@@ -2364,7 +2373,7 @@ class JakeyBot(commands.Bot):
                                 "discord_send_message": ["channel_id", "content"],
                                 "discord_send_dm": ["user_id", "content"],
                                 "fattips_send_tip": ["from_user_id", "to_user_id", "amount", "token"],
-                                "fattips_create_rain": ["creator_id", "token", "amount_per_user", "number_of_users"],
+                                "fattips_create_rain": ["creator_id", "amount"],
                                 "fattips_claim_airdrop": ["claimant_id", "airdrop_id"],
                             }
 

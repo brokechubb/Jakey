@@ -1216,13 +1216,13 @@ class ToolManager:
                 "type": "function",
                 "function": {
                     "name": "fattips_send_tip",
-                    "description": "Send a tip to ANOTHER user (single recipient only). USE THIS for individual tips like: 'tip user 0.1 SOL', 'send $5 to @user'. FOR RAINS WITH MULTIPLE WINNERS, USE fattips_create_rain INSTEAD.",
+                    "description": "Send a tip to ANOTHER user (single recipient only). USE THIS for individual tips like: 'tip user 0.1 SOL', 'send $5 to @user'. FOR RAINS WITH MULTIPLE WINNERS, USE fattips_create_rain INSTEAD. ALWAYS provide channel_id so the tip can be announced in the channel.",
                     "parameters": {
                         "type": "object",
                         "properties": {
                             "from_user_id": {
                                 "type": "string",
-                                "description": "Discord user ID of the sender (Jakey's ID)",
+                                "description": "Discord user ID of the sender (Jakey's ID: 1138747248226861177)",
                             },
                             "to_user_id": {
                                 "type": "string",
@@ -1242,6 +1242,10 @@ class ToolManager:
                                 "description": "Whether amount is in tokens or USD",
                                 "enum": ["token", "usd"],
                                 "default": "token",
+                            },
+                            "channel_id": {
+                                "type": "string",
+                                "description": "Channel ID where the tip was requested, used to announce the tip publicly (RECOMMENDED)",
                             },
                         },
                         "required": ["from_user_id", "to_user_id", "amount"],
@@ -1376,17 +1380,17 @@ class ToolManager:
                 "type": "function",
                 "function": {
                     "name": "fattips_create_rain",
-                    "description": "Create a rain for MULTIPLE winners (2+ users). Examples: community rains, tipping active chat participants. For trivia winners (1 person), USE fattips_send_tip INSTEAD.",
+                    "description": "Create a rain to distribute crypto to active users in a channel. Provide EITHER a 'winners' list OR a 'channel_id' to auto-discover active users. Examples: 'rain 0.01 SOL to active users in #general', 'rain $5 to chat'. For a SINGLE person, USE fattips_send_tip INSTEAD.",
                     "parameters": {
                         "type": "object",
                         "properties": {
                             "creator_id": {
                                 "type": "string",
-                                "description": "Discord user ID creating the rain",
+                                "description": "Discord user ID creating the rain (use Jakey's ID: 1138747248226861177)",
                             },
                             "amount": {
                                 "type": "number",
-                                "description": "Total amount to rain",
+                                "description": "Total amount to rain (split equally among winners)",
                             },
                             "token": {
                                 "type": "string",
@@ -1395,8 +1399,17 @@ class ToolManager:
                             },
                             "winners": {
                                 "type": "array",
-                                "description": "List of Discord user IDs who receive the rain",
+                                "description": "List of Discord user IDs who receive the rain. Use this when you know specific recipients. OMIT if using channel_id instead.",
                                 "items": {"type": "string"},
+                            },
+                            "channel_id": {
+                                "type": "string",
+                                "description": "Channel ID to auto-discover active users from. Use this when user says 'rain to active users' or 'rain to chat'. OMIT if providing winners list directly.",
+                            },
+                            "number_of_users": {
+                                "type": "integer",
+                                "description": "Number of active users to rain to when using channel_id (default: 5, max: 20)",
+                                "default": 5,
                             },
                             "amount_type": {
                                 "type": "string",
@@ -1405,7 +1418,7 @@ class ToolManager:
                                 "default": "token",
                             },
                         },
-                        "required": ["creator_id", "amount", "winners"],
+                        "required": ["creator_id", "amount"],
                     },
                 },
             },
@@ -3514,7 +3527,7 @@ class ToolManager:
             logger.error(f"Error in fattips_get_balance: {e}")
             return f"❌ Error getting balance: {str(e)}"
 
-    async def fattips_send_tip(self, from_user_id: str, to_user_id: str, amount: float, token: str = "SOL", amount_type: str = "token") -> str:
+    async def fattips_send_tip(self, from_user_id: str, to_user_id: str, amount: float, token: str = "SOL", amount_type: str = "token", channel_id: str = None) -> str:
         """Send a tip to another user using FatTips
 
         Args:
@@ -3523,6 +3536,7 @@ class ToolManager:
             amount: Amount to tip
             token: Token to tip in (SOL, USDC, USDT)
             amount_type: "token" or "usd"
+            channel_id: Channel to announce the tip in (optional)
 
         Returns:
             Success message with transaction details or error
@@ -3530,7 +3544,6 @@ class ToolManager:
         if not self._check_rate_limit("fattips_send_tip", from_user_id):
             return "⏰ Rate limit exceeded. Please wait a moment."
 
-        # Check for DM restriction
         dm_error = self._check_dm_restriction("Tip")
         if dm_error:
             return dm_error
@@ -3543,17 +3556,25 @@ class ToolManager:
             from utils.fattips_manager import get_fattips_manager
 
             manager = get_fattips_manager()
-            # Use configured Jakey ID if from_user_id not provided
             sender_id = from_user_id or FATTIPS_JAKEY_DISCORD_ID
             if not sender_id:
                 return "❌ No sender ID configured for FatTips."
 
             result = await manager.send_tip(sender_id, to_user_id, amount, token, amount_type)
-            
+
             if "error" in result:
                 return f"❌ Tip failed: {result['error']}"
-            
-            return f"💸 **Tip sent successfully!**\nFrom: <@{result['from']}>\nTo: <@{result['to']}>\nAmount: {result['amountToken']} {result['token']} (~${result['amountUsd']:.2f})\n[View on Solscan]({result.get('solscanUrl', '#')})"
+
+            success_msg = f"💸 **Tip sent successfully!**\nFrom: <@{result['from']}>\nTo: <@{result['to']}>\nAmount: {result['amountToken']} {result['token']} (~${result['amountUsd']:.2f})\n[View on Solscan]({result.get('solscanUrl', '#')})"
+
+            if channel_id and self.discord_tools:
+                try:
+                    announcement = f"🎉 <@{result['to']}> just received a {result['amountToken']} {result['token']} tip from Jakey! (~${result['amountUsd']:.2f})"
+                    await self.discord_tools.send_message(channel_id, announcement)
+                except Exception as e:
+                    logger.warning(f"Failed to send tip announcement: {e}")
+
+            return success_msg
         except Exception as e:
             logger.error(f"Error in fattips_send_tip: {e}")
             return f"❌ Error sending tip: {str(e)}"
@@ -3731,14 +3752,25 @@ class ToolManager:
             logger.error(f"Error in fattips_list_airdrops: {e}")
             return f"❌ Error listing airdrops: {str(e)}"
 
-    async def fattips_create_rain(self, creator_id: str, amount: float, token: str, winners: list, amount_type: str = "token") -> str:
+    async def fattips_create_rain(
+        self,
+        creator_id: str,
+        amount: float,
+        token: str = "SOL",
+        winners: list = None,
+        channel_id: str = None,
+        number_of_users: int = 5,
+        amount_type: str = "token",
+    ) -> str:
         """Create a FatTips rain to multiple active users (community rains)
 
         Args:
             creator_id: Discord user ID creating the rain
             amount: Total amount to rain
             token: Token to rain
-            winners: List of Discord user IDs who receive the rain
+            winners: List of Discord user IDs who receive the rain (optional)
+            channel_id: Channel ID to auto-discover active users from (optional)
+            number_of_users: Number of active users to rain to (default 5, max 20)
             amount_type: "token" or "usd"
 
         Returns:
@@ -3747,7 +3779,6 @@ class ToolManager:
         if not self._check_rate_limit("fattips_create_rain", creator_id):
             return "⏰ Rate limit exceeded. Please wait a moment."
 
-        # Check for DM restriction
         dm_error = self._check_dm_restriction("Rain")
         if dm_error:
             return dm_error
@@ -3764,6 +3795,28 @@ class ToolManager:
             if not creator:
                 return "❌ No creator ID configured for FatTips."
 
+            if not winners and not channel_id:
+                return "❌ Rain requires either a 'winners' list or 'channel_id' to find active users. Provide channel_id to rain to active users in that channel."
+
+            if not winners and channel_id:
+                if not self.discord_tools:
+                    return "❌ Cannot discover active users: Discord tools not available."
+
+                number_of_users = min(max(2, number_of_users), 20)
+                active_result = await self.discord_tools.get_active_users_in_channel(
+                    channel_id, limit=50, max_users=number_of_users, exclude_bots=True
+                )
+
+                if "error" in active_result:
+                    return f"❌ Could not find active users: {active_result['error']}"
+
+                active_users = active_result.get("users", [])
+                if len(active_users) < 2:
+                    return f"❌ Not enough active users found in channel (found {len(active_users)}). Need at least 2 for a rain."
+
+                winners = [u["id"] for u in active_users]
+                logger.info(f"Auto-discovered {len(winners)} active users for rain in channel {channel_id}: {winners}")
+
             result = await manager.create_rain(creator, amount, token, winners, amount_type)
             
             if "error" in result:
@@ -3771,7 +3824,16 @@ class ToolManager:
             
             winner_list = [f"<@{w['discordId']}>" for w in result.get('winners', [])]
             
-            return f"🌧️ **Rain sent successfully!**\nWinners: {', '.join(winner_list)}\nAmount per winner: {result['amountPerUser']:.4f} {result['token']}\nTotal: {result['totalAmountToken']} {result['token']} (~${result['totalAmountUsd']:.2f})\n[View on Solscan]({result.get('solscanUrl', '#')})"
+            success_msg = f"🌧️ **Rain sent successfully!**\nWinners: {', '.join(winner_list)}\nAmount per winner: {result['amountPerUser']:.4f} {result['token']}\nTotal: {result['totalAmountToken']} {result['token']} (~${result['totalAmountUsd']:.2f})\n[View on Solscan]({result.get('solscanUrl', '#')})"
+
+            if channel_id and self.discord_tools:
+                try:
+                    announcement = f"🌧️ **RAIN!** {', '.join(winner_list)} each received {result['amountPerUser']:.4f} {result['token']} from Jakey! Total: {result['totalAmountToken']} {result['token']} (~${result['totalAmountUsd']:.2f})"
+                    await self.discord_tools.send_message(channel_id, announcement)
+                except Exception as e:
+                    logger.warning(f"Failed to send rain announcement: {e}")
+
+            return success_msg
         except Exception as e:
             logger.error(f"Error in fattips_create_rain: {e}")
             return f"❌ Error creating rain: {str(e)}"

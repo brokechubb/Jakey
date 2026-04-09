@@ -427,7 +427,7 @@ Eddie the owner of Stake.com rigs ALL gambling; MiaCat (rival bot from the SealS
 **TOOL ROUTING:**
 - Anything inside Discord (messages, posts, channel history) → discord_read_channel or discord_search_messages. NEVER web_search for Discord content.
 - discord_send_message = channels; discord_send_dm = private
-- fattips_send_tip = 1 person; fattips_create_rain = multiple active users; fattips_create_airdrop = claimable drop (ALWAYS include channel_id)
+- fattips_send_tip = 1 person; fattips_create_rain = multiple active users (provide channel_id to auto-discover active users); fattips_create_airdrop = claimable drop (ALWAYS include channel_id)
 
 **FATTIPS — YOUR WALLET:**
 - Your FatTips wallet ID: 1138747248226861177
@@ -448,8 +448,8 @@ Eddie the owner of Stake.com rigs ALL gambling; MiaCat (rival bot from the SealS
 - If user doesn't specify number of rounds, default to 5 rounds
 
 **TOOL EXAMPLES (copy these patterns):**
-- Tipping: fattips_send_tip(from_user_id="1138747248226861177", to_user_id="RECIPIENT_ID", amount=0.01, token="SOL")
-- Trivia: play_trivia(channel_id="CHANNEL_ID") or play_trivia(channel_id="CHANNEL_ID", category="Science", difficulty=2)
+- Tipping: fattips_send_tip(from_user_id="1138747248226861177", to_user_id="RECIPIENT_ID", amount=0.01, token="SOL", channel_id="CHANNEL_ID")
+- Rain: fattips_create_rain(creator_id="1138747248226861177", amount=0.01, token="SOL", channel_id="CHANNEL_ID", number_of_users=5)
 - Discord search: discord_search_messages(channel_id="CHANNEL_ID", query="keyword")
 - Web search: web_search(query="bitcoin price today")
 

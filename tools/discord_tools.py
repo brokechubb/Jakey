@@ -998,5 +998,65 @@ class DiscordTools:
              logger.error(f"Error deleting message: {e}")
              return {"error": f"Failed to delete message: {str(e)}"}
 
+async def get_active_users_in_channel(
+        self, channel_id: str, limit: int = 50, max_users: int = 10, exclude_bots: bool = True
+    ) -> Dict[str, Any]:
+        """
+        Get active users from a channel based on recent message activity.
+        Returns unique authors from recent messages, ordered by most recent activity.
+        
+        Args:
+            channel_id: The channel ID to scan for active users
+            limit: Number of recent messages to scan (default 50)
+            max_users: Maximum number of unique users to return (default 10)
+            exclude_bots: Whether to exclude bot accounts (default True)
+        
+        Returns:
+            Dict with 'users' list containing active user info
+        """
+        try:
+            channel_id_clean = self._parse_channel_id(channel_id)
+            if channel_id_clean is None:
+                return {"error": f"Invalid channel ID format: {channel_id}"}
+            
+            channel = self.bot.get_channel(channel_id_clean)
+            if not channel:
+                try:
+                    channel = await self.bot.fetch_channel(channel_id_clean)
+                except (discord.NotFound, discord.Forbidden):
+                    return {"error": f"Channel {channel_id} not found or no access"}
+            
+            if not isinstance(channel, discord.TextChannel):
+                return {"error": f"Channel {channel_id} is not a text channel"}
+            
+            users = {}
+            try:
+                async for message in channel.history(limit=limit):
+                    author_id = str(message.author.id)
+                    if exclude_bots and message.author.bot:
+                        continue
+                    
+                    if author_id not in users:
+                        users[author_id] = {
+                            "id": author_id,
+                            "username": message.author.name,
+                            "display_name": message.author.display_name,
+                            "last_message_time": message.created_at.isoformat()
+                        }
+                    
+                    if len(users) >= max_users:
+                        break
+            except discord.Forbidden:
+                return {"error": f"No permission to read channel {channel_id}"}
+            
+            return {
+                "users": list(users.values()),
+                "count": len(users),
+                "channel_id": str(channel_id_clean)
+            }
+        except Exception as e:
+            logger.error(f"Error getting active users from channel {channel_id}: {e}")
+            return {"error": f"Failed to get active users: {str(e)}"}
+
 # Global Discord tools instance (will be initialized with bot client)
 discord_tools = None
