@@ -2591,6 +2591,12 @@ class JakeyBot(commands.Bot):
                         ):
                             ai_message = final_response["choices"][0]["message"]
                             content = ai_message.get("content", "")
+                            
+                            logger.info(
+                                f"Tool round {tool_round} follow-up: content={'EMPTY' if not content else repr(content[:150])}, "
+                                f"has_tool_calls={bool(ai_message.get('tool_calls'))}, "
+                                f"has_reasoning={bool(ai_message.get('reasoning'))}"
+                            )
 
                             # Check reasoning
                             if not content and ai_message.get("reasoning"):
