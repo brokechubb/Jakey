@@ -3329,6 +3329,10 @@ class ToolManager:
 
             diff_level = question.get("difficulty", 1)
 
+            answer_lower = question["answer_text"].strip().lower()
+            is_true_false = answer_lower in ("true", "false")
+            hint_line = "" if is_true_false else f"\n\n💡 *Hint: The answer has {len(question['answer_text'])} characters*"
+
             trivia_message = f"""**🎮 TRIVIA TIME! 🎮**
 
 📚 **Category:** {category}
@@ -3337,9 +3341,7 @@ class ToolManager:
 **❓ Question:**
 {question["question_text"]}
 
-⏱️ You have 30 seconds to answer! Just type your answer in chat.
-
-💡 *Hint: The answer has {len(question["answer_text"])} characters*"""
+⏱️ You have 30 seconds to answer! Just type your answer in chat.{hint_line}"""
 
             # Post the question to the channel using the Discord tools if available
             if self.discord_tools:
