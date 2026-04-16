@@ -34,6 +34,10 @@ TOOL_CALL_JSON_PATTERN = re.compile(
     r'\{"type"\s*:\s*"function"\s*,\s*"name"\s*:\s*"([^"]+)"\s*,\s*"parameters"\s*:\s*(\{[^\}]+\})\}',
     re.DOTALL,
 )
+TOOL_CALL_COLON_JSON_PATTERN = re.compile(
+    r'\b([a-z]\w*)\s*:\s*\d+\s+(\{[^}]+\})',
+    re.DOTALL | re.IGNORECASE,
+)
 # Wen command pattern
 WEN_PATTERN = re.compile(r"\b(wen+\?+)$", re.IGNORECASE)
 # Path sanitization pattern
@@ -191,6 +195,36 @@ def extract_text_tool_calls(ai_response: str) -> Tuple[List[Dict], str]:
         cleaned_response = TOOL_CALL_JSON_PATTERN.sub("", cleaned_response).strip()
 
         # If we found any JSON tool calls, return them
+        if all_tool_calls:
+            return all_tool_calls, cleaned_response
+
+    # Try colon-number-JSON format (e.g., fattips_get_balance:0 {"user_id": "123"})
+    colon_json_matches = list(TOOL_CALL_COLON_JSON_PATTERN.finditer(ai_response))
+    if colon_json_matches:
+        for match in colon_json_matches:
+            try:
+                function_name = match.group(1)
+                parameters_str = match.group(2)
+                parameters = json.loads(parameters_str)
+
+                if function_name not in valid_tool_names:
+                    logging.getLogger(__name__).debug(
+                        f"Extracted function '{function_name}' not in valid tools, ignoring"
+                    )
+                    continue
+
+                tool_call = {
+                    "id": f"manual_{int(time.time())}_{len(all_tool_calls)}",
+                    "type": "function",
+                    "function": {"name": function_name, "arguments": parameters},
+                }
+                all_tool_calls.append(tool_call)
+            except (json.JSONDecodeError, IndexError) as e:
+                logging.getLogger(__name__).debug(f"Failed to parse colon-number-JSON tool call: {e}")
+                continue
+
+        cleaned_response = TOOL_CALL_COLON_JSON_PATTERN.sub("", cleaned_response).strip()
+
         if all_tool_calls:
             return all_tool_calls, cleaned_response
 
@@ -430,6 +464,9 @@ def sanitize_ai_response(response: str) -> str:
 
     # Remove JSON-formatted tool calls: {"type": "function", "name": "...", "parameters": {...}}
     sanitized = JSON_TOOL_CALL_PATTERN.sub("", sanitized)
+
+    # Remove colon-number-JSON format tool calls: fattips_get_balance:0 {"user_id": "123"}
+    sanitized = TOOL_CALL_COLON_JSON_PATTERN.sub("", sanitized)
 
     # Remove structured content wrapper: [{'type': 'text', 'text': "..."}] -> extract inner text
     structured_match = STRUCTURED_CONTENT_EXTRACT.match(sanitized)
