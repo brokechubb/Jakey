@@ -269,6 +269,7 @@ class OpenAICompatibleAPI:
                 )
 
                 if response.status_code == 200:
+                    response.encoding = "utf-8"
                     raw_text = response.text
                     if "data:" in raw_text:
                         raw_text = raw_text.split("data:")[0].rstrip()
