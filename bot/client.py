@@ -88,6 +88,10 @@ THINKING_BLOCK_PATTERNS = [
         r"\*(?:searches?|checks?|looks? up|finds?|gets?|calls?|uses?|runs?|executes?|queries?|fetches?|retrieves?)[^*]*\*",
         re.IGNORECASE,
     ),
+    # Internal marker tags leaked from model training (e.g. [TARGET_SUCCESS]...[/TARGET_SUCCESS])
+    re.compile(r"\[TARGET_[A-Z]+\].*?\[/TARGET_[A-Z]+\]", re.DOTALL | re.IGNORECASE),
+    re.compile(r"\[RESPONSE_[A-Z]+\].*?\[/RESPONSE_[A-Z]+\]", re.DOTALL | re.IGNORECASE),
+    re.compile(r"\[(?:OUTPUT|RESULT|STATUS|ACTION|INTENT)_[A-Z]+\].*?\[/(?:OUTPUT|RESULT|STATUS|ACTION|INTENT)_[A-Z]+\]", re.DOTALL | re.IGNORECASE),
 ]
 
 RAW_FUNCTION_PATTERN = re.compile(r"\b[a-z_]+\s*\{[^}]*\}", re.IGNORECASE)
