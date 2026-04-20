@@ -5,6 +5,7 @@ A lightweight provider for any OpenAI-compatible endpoint (LocalAI, Ollama, vLLM
 This is the default provider for Jakey, using a local endpoint at localhost:8317.
 """
 
+import json
 import random
 import threading
 import time
@@ -268,7 +269,10 @@ class OpenAICompatibleAPI:
                 )
 
                 if response.status_code == 200:
-                    result = response.json()
+                    raw_text = response.text
+                    if "data:" in raw_text:
+                        raw_text = raw_text.split("data:")[0].rstrip()
+                    result = json.loads(raw_text)
 
                     # Check for error in response body
                     if isinstance(result, dict) and "error" in result:
