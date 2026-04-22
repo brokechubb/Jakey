@@ -273,7 +273,26 @@ class OpenAICompatibleAPI:
                     raw_text = response.text
                     if "data:" in raw_text:
                         raw_text = raw_text.split("data:")[0].rstrip()
-                    result = json.loads(raw_text)
+                    if not raw_text.strip():
+                        if attempt < max_retries:
+                            logger.warning(
+                                f"OpenAI-Compatible: Empty response body (200). Retrying..."
+                            )
+                            time.sleep(retry_delay * (2 ** attempt))
+                            continue
+                        logger.error("OpenAI-Compatible: Empty response body after all retries")
+                        return {"error": "Empty response from API"}
+                    try:
+                        result = json.loads(raw_text)
+                    except (json.JSONDecodeError, ValueError) as parse_err:
+                        if attempt < max_retries:
+                            logger.warning(
+                                f"OpenAI-Compatible: JSON parse error: {parse_err}. Retrying..."
+                            )
+                            time.sleep(retry_delay * (2 ** attempt))
+                            continue
+                        logger.error(f"OpenAI-Compatible: JSON parse error after all retries: {parse_err}")
+                        return {"error": f"Invalid JSON response: {parse_err}"}
 
                     # Check for error in response body
                     if isinstance(result, dict) and "error" in result:

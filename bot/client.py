@@ -2178,8 +2178,9 @@ class JakeyBot(commands.Bot):
                 max_tokens=500,  # ~200 words max for standard responses
                 tools=available_tools,
                 tool_choice="auto" if available_tools else "none",
-                # Anti-repetition parameters from OpenRouter API
-                repetition_penalty=1.15,  # Slightly penalize repeated tokens
+                # Anti-repetition parameters (frequency/presence penalty are
+                # widely supported; repetition_penalty is HuggingFace/vLLM-only
+                # and breaks many OpenAI-compatible servers with HTTP 400)
                 frequency_penalty=0.3,  # Reduce repetition of frequent tokens
                 presence_penalty=0.2,  # Slightly reduce repetition of present tokens
                 # Enable model fallback routing for reliability
