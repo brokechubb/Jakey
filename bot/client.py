@@ -38,6 +38,10 @@ TOOL_CALL_COLON_JSON_PATTERN = re.compile(
     r'\b([a-z]\w*)\s*:\s*\d+\s+(\{[^}]+\})',
     re.DOTALL | re.IGNORECASE,
 )
+BARE_JSON_OBJECT_PATTERN = re.compile(
+    r'\{\s*"[a-z_]+"\s*:\s*[^}]+\}',
+    re.DOTALL,
+)
 # Wen command pattern
 WEN_PATTERN = re.compile(r"\b(wen+\?+)$", re.IGNORECASE)
 # Path sanitization pattern
@@ -130,6 +134,58 @@ STRUCTURED_CONTENT_EXTRACT = re.compile(
     + r"[\"']\s*\}\s*\]",
     re.DOTALL | re.IGNORECASE,
 )
+
+
+def _match_bare_json_to_tool(json_obj: dict, valid_tool_schemas: dict) -> Optional[Tuple[str, dict]]:
+    """
+    Try to match a bare JSON object (no function name) to a known tool by comparing its keys
+    against tool parameter schemas. Returns (tool_name, parameters) or None.
+
+    Uses a scoring system: requires at least 60% of the JSON keys to match a tool's required params,
+    and the JSON must contain at least 2 keys that match the tool's properties.
+    """
+    if not json_obj or not isinstance(json_obj, dict):
+        return None
+
+    json_keys = set(json_obj.keys())
+    if len(json_keys) < 2:
+        return None
+
+    best_match = None
+    best_score = 0.0
+
+    for tool_name, tool_props in valid_tool_schemas.items():
+        tool_param_keys = set(tool_props.keys())
+        overlap = json_keys & tool_param_keys
+        if len(overlap) < 2:
+            continue
+        coverage = len(overlap) / max(len(json_keys), 1)
+        param_coverage = len(overlap) / max(len(tool_param_keys), 1)
+        score = coverage * 0.6 + param_coverage * 0.4
+        if score > best_score and coverage >= 0.5:
+            best_score = score
+            best_match = tool_name
+
+    if best_match and best_score >= 0.3:
+        return best_match, json_obj
+    return None
+
+
+def _get_tool_schemas_map() -> dict:
+    """Build a map of tool_name -> {param_name: param_type} from available tools."""
+    try:
+        from tools.tool_manager import tool_manager
+        available_tools = tool_manager.get_available_tools()
+        schemas = {}
+        for tool in available_tools:
+            func = tool.get("function", {})
+            name = func.get("name")
+            props = func.get("parameters", {}).get("properties", {})
+            if name and props:
+                schemas[name] = props
+        return schemas
+    except Exception:
+        return {}
 
 
 def extract_text_tool_calls(ai_response: str) -> Tuple[List[Dict], str]:
@@ -408,6 +464,36 @@ def extract_text_tool_calls(ai_response: str) -> Tuple[List[Dict], str]:
         if all_tool_calls:
             return all_tool_calls, cleaned_response
 
+    # Try bare JSON objects (no function name, just raw parameters)
+    bare_json_matches = list(BARE_JSON_OBJECT_PATTERN.finditer(ai_response))
+    if bare_json_matches:
+        tool_schemas = _get_tool_schemas_map()
+        for match in bare_json_matches:
+            try:
+                json_str = match.group(0)
+                parsed = json.loads(json_str)
+                if not isinstance(parsed, dict) or len(parsed) < 2:
+                    continue
+                result = _match_bare_json_to_tool(parsed, tool_schemas)
+                if result:
+                    tool_name, parameters = result
+                    tool_call = {
+                        "id": f"manual_{int(time.time())}_{len(all_tool_calls)}",
+                        "type": "function",
+                        "function": {"name": tool_name, "arguments": parameters},
+                    }
+                    all_tool_calls.append(tool_call)
+                    cleaned_response = cleaned_response.replace(json_str, "").strip()
+                    logger.info(
+                        f"Matched bare JSON to tool '{tool_name}' with {len(parameters)} params"
+                    )
+            except (json.JSONDecodeError, Exception) as e:
+                logging.getLogger(__name__).debug(f"Failed to parse bare JSON: {e}")
+                continue
+
+        if all_tool_calls:
+            return all_tool_calls, cleaned_response
+
     # No tool calls found
     return [], ai_response
 
@@ -471,6 +557,21 @@ def sanitize_ai_response(response: str) -> str:
 
     # Remove colon-number-JSON format tool calls: fattips_get_balance:0 {"user_id": "123"}
     sanitized = TOOL_CALL_COLON_JSON_PATTERN.sub("", sanitized)
+
+    # Remove bare JSON objects that look like tool parameters (no function name, just raw params)
+    bare_json_matches = list(BARE_JSON_OBJECT_PATTERN.finditer(sanitized))
+    if bare_json_matches:
+        tool_schemas = _get_tool_schemas_map()
+        for match in bare_json_matches:
+            try:
+                parsed = json.loads(match.group(0))
+                if isinstance(parsed, dict) and len(parsed) >= 2:
+                    result = _match_bare_json_to_tool(parsed, tool_schemas)
+                    if result:
+                        sanitized = sanitized.replace(match.group(0), "")
+                        logger.info(f"Sanitized bare JSON tool params (matched to '{result[0]}')")
+            except (json.JSONDecodeError, Exception):
+                pass
 
     # Remove structured content wrapper: [{'type': 'text', 'text': "..."}] -> extract inner text
     structured_match = STRUCTURED_CONTENT_EXTRACT.match(sanitized)
@@ -999,17 +1100,18 @@ class JakeyBot(commands.Bot):
         # Core tools always included — needed for any response
         # These are essential tools that should ALWAYS be available
         ALWAYS_INCLUDE = {
-            "web_search", "get_current_time", "calculate",
-            "remember_user_info", "search_user_memory",
-            # Games - essential for server engagement
-            "play_trivia", "start_trivia_session", "generate_keno_numbers",
-            # FatTips - frequently needed for tipping/rain
-            "fattips_get_balance", "fattips_send_tip", "fattips_create_rain",
-            "fattips_get_wallet", "fattips_list_airdrops",
-            # Images - commonly used
-            "generate_image", "analyze_image",
-            # Discord basics
-            "discord_get_user_info", "discord_send_message", "discord_send_dm",
+        "web_search", "get_current_time", "calculate",
+        "remember_user_info", "search_user_memory",
+        # Games - essential for server engagement
+        "play_trivia", "start_trivia_session", "generate_keno_numbers",
+        # FatTips - frequently needed for tipping/rain
+        "fattips_get_balance", "fattips_send_tip", "fattips_create_rain",
+        "fattips_get_wallet", "fattips_list_airdrops",
+        # Images - commonly used
+        "generate_image", "analyze_image",
+        # Discord basics
+        "discord_get_user_info", "discord_send_message", "discord_send_dm",
+        "discord_read_channel", "discord_search_messages",
         }
 
         # Keyword → tool names to add
