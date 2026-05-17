@@ -825,24 +825,24 @@ def setup_commands(bot):
                     
                     # Recommended local models with tool support info
                     recommended_local = [
-                        ("qwen3-coder", "Best overall - fast, coherent, tool support ✅"),
-                        ("qwen3-max", "High quality - excellent for complex tasks ✅"),
-                        ("glm-4.6", "Stable - good without tools 🔧"),
-                        ("gemini-2.5-flash", "Fast - reliable responses ✅"),
-                        ("deepseek-v3", "Smart - NO TOOLS (corrupted with function calling) ❌"),
+                        ("deepseek-v3.1", "Ollama Cloud — reliable tool support ✅"),
+                        ("deepseek-v3.1-cb", "SambaNova Free — tool support ✅"),
+                        ("deepseek-v3.2", "Nvidia NIM — tool support ✅"),
+                        ("deepseek-v4-flash", "OpenCode Go — tool support ✅"),
+                        ("kimi-k2", "Ollama Cloud — tool support ✅"),
+                        ("gpt-oss-120b", "Nvidia NIM — tool support ✅"),
+                        ("gpt-oss-20b", "Nvidia NIM — tool support ✅"),
+                        ("mistral-large-3", "Nvidia NIM — tool support ✅"),
+                        ("mistral-medium-3", "Nvidia NIM — tool support ✅"),
+                        ("mistral-small-4", "Nvidia NIM — tool support ✅"),
                     ]
                     
-                    response += "**⭐ RECOMMENDED:**\n"
+                    response += "**✅ WORKING MODELS:**\n"
                     for model, desc in recommended_local:
                         if model in compat_models:
                             response += f"`{model}` - {desc}\n"
                     
-                    response += "\n**⚠️ AVOID:**\n"
-                    response += "`qwen3-coder-flash` - Produces garbage output ❌\n"
-                    response += "`glm4.5-air` - Unstable with tools ❌\n"
-                    
-                    response += f"\n**All Available:** {len(compat_models)} models\n"
-                    response += "*Use `%model <name>` to switch*\n\n"
+                    response += f"\n*Use `%model <name>` to switch*\n\n"
                 else:
                     response += "**LOCAL MODELS** - *Unavailable (connection failed)*\n\n"
 

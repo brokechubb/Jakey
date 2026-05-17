@@ -1003,8 +1003,6 @@ class JakeyBot(commands.Bot):
         tool_broken_models = [
             "qwen3-coder-flash",  # Produces garbage with tools
             "deepseek-v3",  # Has issues with 42+ tools
-            "deepseek-v3.1",  # Has issues with 42+ tools
-            "deepseek-v3.2",  # Has issues with 42+ tools
             "glm4.5-air",  # Better without tools
         ]
         if model_key in tool_broken_models:
@@ -1012,36 +1010,18 @@ class JakeyBot(commands.Bot):
             return False
         
         # Special case: Known models that support tools regardless of API data
-        # Models confirmed available on the local endpoint
+        # Models confirmed working on the local endpoint
         trusted_tool_models = [
-            "kimi-k2",                             # IFLOW — uncensored
-            "kimi-k2.5",                           # OLLAMA CLOUD — uncensored
-            "kimi-k2-instruct",                    # MOONSHOT NIM
-            "kimi-k2-instruct-0905",               # MOONSHOT NIM variant
-            "kimi-k2-thinking",                    # OLLAMA CLOUD thinking variant
-            "llama-4-maverick",                    # META NIM — uncensored
-            "llama-4-scout",                       # META NIM
-            "llama-3.3-70b-instruct",              # META NIM
-            "llama-3.1-nemotron-ultra-253b",       # NVIDIA NIM
-            "llama-3.1-nemotron-70b-instruct",     # NVIDIA NIM
-            "llama-3.1-nemotron-51b-instruct",     # NVIDIA NIM
-            "mistral-large-3-675b-instruct-2512",  # MISTRAL NIM — minimal filtering
-            "mistral-small-3.1-24b-instruct-2503", # MISTRAL NIM
-            "devstral-2-123b-instruct-2512",       # MISTRAL NIM
-            "ministral-14b-instruct-2512",         # MISTRAL NIM
-            "qwen3-coder",                         # QWEN — stable tool use
-            "qwen3-max",                           # IFLOW
-            "qwen3-max-preview",                   # IFLOW
-            "qwen3-235b",                          # IFLOW
-            "qwen3-235b-a22b-instruct",            # IFLOW
-            "qwen3-32b",                           # IFLOW
-            "qwen3-coder-480b-a35b-instruct",      # QWEN NIM
-            "qwen3-next",                          # OLLAMA CLOUD
-            "qwen3-coder-next",                    # OLLAMA CLOUD
-            "deepseek-v3.1-terminus",              # DEEPSEEK NIM (different from broken v3.1)
-            "gpt-oss-120b",                        # OLLAMA CLOUD
-            "minimax-m2.5",                        # OLLAMA CLOUD
-            "minimax-m2.1",                        # MINIMAX NIM
+            "deepseek-v3.1",       # Ollama Cloud
+            "deepseek-v3.1-cb",    # SambaNova Free
+            "deepseek-v3.2",       # Nvidia NIM
+            "deepseek-v4-flash",   # OpenCode Go
+            "kimi-k2",             # Ollama Cloud
+            "gpt-oss-120b",        # Nvidia NIM
+            "gpt-oss-20b",         # Nvidia NIM
+            "mistral-large-3",     # Nvidia NIM
+            "mistral-medium-3",    # Nvidia NIM
+            "mistral-small-4",     # Nvidia NIM
         ]
         if model_key in trusted_tool_models:
             logger.debug(f"Model '{model_key}' is in trusted tool models list")
