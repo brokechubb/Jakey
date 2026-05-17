@@ -69,7 +69,11 @@ def sanitize_messages_for_api(messages: List[Dict[str, Any]]) -> List[Dict[str, 
         # Handle tool_call_id for tool messages
         if "tool_call_id" in msg:
             clean_msg["tool_call_id"] = msg["tool_call_id"]
-            
+
+        # DeepSeek thinking mode requires reasoning_content to be echoed back
+        if "reasoning_content" in msg and msg["reasoning_content"]:
+            clean_msg["reasoning_content"] = msg["reasoning_content"]
+
         sanitized.append(clean_msg)
         
     return sanitized

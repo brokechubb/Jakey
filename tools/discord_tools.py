@@ -408,6 +408,10 @@ class DiscordTools:
                     logger.error("Message content cannot be empty")
                     return {"error": "Message content cannot be empty"}
 
+            # Strip internal split markers that should never appear in sent messages
+            if "[CONTINUE]" in content:
+                content = content.replace("[CONTINUE]", "").strip()
+
             # Truncate content to Discord's limit
             content = content[:2000]
 
@@ -701,11 +705,11 @@ class DiscordTools:
             if not user:
                 try:
                     user = await self.bot.fetch_user(int(user_id))
-                except:
+                except Exception:
                     pass
 
             if not user:
-                 return {"error": f"User with ID {user_id} not found/could not be fetched."}
+                return {"error": f"User with ID {user_id} not found/could not be fetched."}
 
             try:
                 # Convert delete_message_seconds to int if it's a string (AI tool calls pass strings)
@@ -748,9 +752,9 @@ class DiscordTools:
             if not user:
                 try:
                     user = await self.bot.fetch_user(int(user_id))
-                except:
+                except Exception:
                     pass
-            
+
             # If we can't find the user object, try to construct a partial one if possible, 
             # or just rely on ID if the lib supports it. But `unban` usually takes a User object.
             if not user:
@@ -835,17 +839,17 @@ class DiscordTools:
             # Parse channel ID
             channel_id_clean = self._parse_channel_id(channel_id)
             if not channel_id_clean:
-                 return {"error": "Invalid channel ID"}
+                return {"error": "Invalid channel ID"}
 
             channel = self.bot.get_channel(channel_id_clean)
             if not channel:
                 try:
                     channel = await self.bot.fetch_channel(channel_id_clean)
-                except:
+                except Exception:
                     return {"error": "Channel not found"}
 
             if not isinstance(channel, discord.TextChannel):
-                 return {"error": "Can only purge messages in text channels"}
+                return {"error": "Can only purge messages in text channels"}
 
             # Convert limit to int if it's a string (AI tool calls pass strings)
             if isinstance(limit, str):
@@ -881,27 +885,27 @@ class DiscordTools:
     async def pin_message(self, channel_id: str, message_id: str) -> Dict[str, Any]:
         """Pin a message in a channel"""
         try:
-             # Parse channel ID
+            # Parse channel ID
             channel_id_clean = self._parse_channel_id(channel_id)
             if not channel_id_clean:
-                 return {"error": "Invalid channel ID"}
-            
+                return {"error": "Invalid channel ID"}
+
             channel = self.bot.get_channel(channel_id_clean)
             if not channel:
                 try:
                     channel = await self.bot.fetch_channel(channel_id_clean)
-                except:
+                except Exception:
                     return {"error": "Channel not found"}
-            
+
             # Ensure channel supports messages
             if not isinstance(channel, (discord.TextChannel, discord.Thread)):
-                 return {"error": f"Cannot pin messages in channel type {type(channel).__name__}"}
+                return {"error": f"Cannot pin messages in channel type {type(channel).__name__}"}
 
             try:
                 message = await channel.fetch_message(int(message_id))
             except discord.NotFound:
                 return {"error": "Message not found"}
-                
+
             try:
                 await message.pin()
                 return {
@@ -913,35 +917,35 @@ class DiscordTools:
             except discord.Forbidden:
                 return {"error": "Permission denied: Cannot pin messages."}
             except discord.HTTPException as e:
-                 return {"error": f"Discord API error: {str(e)}"}
+                return {"error": f"Discord API error: {str(e)}"}
         except Exception as e:
-             logger.error(f"Error pinning message: {e}")
-             return {"error": f"Failed to pin message: {str(e)}"}
+            logger.error(f"Error pinning message: {e}")
+            return {"error": f"Failed to pin message: {str(e)}"}
 
     async def unpin_message(self, channel_id: str, message_id: str) -> Dict[str, Any]:
         """Unpin a message in a channel"""
         try:
-             # Parse channel ID
+            # Parse channel ID
             channel_id_clean = self._parse_channel_id(channel_id)
             if not channel_id_clean:
-                 return {"error": "Invalid channel ID"}
-            
+                return {"error": "Invalid channel ID"}
+
             channel = self.bot.get_channel(channel_id_clean)
             if not channel:
                 try:
                     channel = await self.bot.fetch_channel(channel_id_clean)
-                except:
+                except Exception:
                     return {"error": "Channel not found"}
-            
+
             # Ensure channel supports messages
             if not isinstance(channel, (discord.TextChannel, discord.Thread)):
-                 return {"error": f"Cannot unpin messages in channel type {type(channel).__name__}"}
+                return {"error": f"Cannot unpin messages in channel type {type(channel).__name__}"}
 
             try:
                 message = await channel.fetch_message(int(message_id))
             except discord.NotFound:
                 return {"error": "Message not found"}
-                
+
             try:
                 await message.unpin()
                 return {
@@ -953,10 +957,10 @@ class DiscordTools:
             except discord.Forbidden:
                 return {"error": "Permission denied: Cannot unpin messages."}
             except discord.HTTPException as e:
-                 return {"error": f"Discord API error: {str(e)}"}
+                return {"error": f"Discord API error: {str(e)}"}
         except Exception as e:
-             logger.error(f"Error unpinning message: {e}")
-             return {"error": f"Failed to unpin message: {str(e)}"}
+            logger.error(f"Error unpinning message: {e}")
+            return {"error": f"Failed to unpin message: {str(e)}"}
 
     async def delete_message(self, channel_id: str, message_id: str) -> Dict[str, Any]:
         """Delete a single message from a channel"""
@@ -964,24 +968,24 @@ class DiscordTools:
             # Parse channel ID
             channel_id_clean = self._parse_channel_id(channel_id)
             if not channel_id_clean:
-                 return {"error": "Invalid channel ID"}
-            
+                return {"error": "Invalid channel ID"}
+
             channel = self.bot.get_channel(channel_id_clean)
             if not channel:
                 try:
                     channel = await self.bot.fetch_channel(channel_id_clean)
-                except:
+                except Exception:
                     return {"error": "Channel not found"}
-            
+
             # Ensure channel supports messages
             if not isinstance(channel, (discord.TextChannel, discord.Thread, discord.DMChannel)):
-                 return {"error": f"Cannot delete messages in channel type {type(channel).__name__}"}
+                return {"error": f"Cannot delete messages in channel type {type(channel).__name__}"}
 
             try:
                 message = await channel.fetch_message(int(message_id))
             except discord.NotFound:
                 return {"error": "Message not found"}
-                
+
             try:
                 await message.delete()
                 return {
@@ -993,10 +997,10 @@ class DiscordTools:
             except discord.Forbidden:
                 return {"error": "Permission denied: Cannot delete message."}
             except discord.HTTPException as e:
-                 return {"error": f"Discord API error: {str(e)}"}
+                return {"error": f"Discord API error: {str(e)}"}
         except Exception as e:
-             logger.error(f"Error deleting message: {e}")
-             return {"error": f"Failed to delete message: {str(e)}"}
+            logger.error(f"Error deleting message: {e}")
+            return {"error": f"Failed to delete message: {str(e)}"}
 
     async def get_active_users_in_channel(
         self, channel_id: str, limit: int = 50, max_users: int = 10, exclude_bots: bool = True

@@ -825,7 +825,7 @@ def setup_commands(bot):
                     
                     # Recommended local models with tool support info
                     recommended_local = [
-                        ("qwen3-coder-plus", "Best overall - fast, coherent, tool support ✅"),
+                        ("qwen3-coder", "Best overall - fast, coherent, tool support ✅"),
                         ("qwen3-max", "High quality - excellent for complex tasks ✅"),
                         ("glm-4.6", "Stable - good without tools 🔧"),
                         ("gemini-2.5-flash", "Fast - reliable responses ✅"),

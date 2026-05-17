@@ -1029,7 +1029,7 @@ class JakeyBot(commands.Bot):
             "mistral-small-3.1-24b-instruct-2503", # MISTRAL NIM
             "devstral-2-123b-instruct-2512",       # MISTRAL NIM
             "ministral-14b-instruct-2512",         # MISTRAL NIM
-            "qwen3-coder-plus",                    # QWEN — stable tool use
+            "qwen3-coder",                         # QWEN — stable tool use
             "qwen3-max",                           # IFLOW
             "qwen3-max-preview",                   # IFLOW
             "qwen3-235b",                          # IFLOW
@@ -2331,6 +2331,7 @@ class JakeyBot(commands.Bot):
 
             # Parse OpenAI-format response from providers
             generated_image_urls = []  # Track image URLs to ensure they're in the response
+            discord_sent_via_tool = []  # Track (channel_id, content) sent by discord_send_message tool
             if "choices" in response and len(response["choices"]) > 0:
                 ai_message = response["choices"][0]["message"]
                 content = ai_message.get("content", "")
@@ -2577,6 +2578,14 @@ class JakeyBot(commands.Bot):
                                     f"📸 Tracked generated image URL for response"
                                 )
 
+                            # Track messages sent via discord_send_message to detect duplicates
+                            if function_name == "discord_send_message" and isinstance(result, dict) and "message" in result:
+                                sent_channel = str(arguments.get("channel_id", ""))
+                                sent_content = arguments.get("content", "")
+                                if sent_content:
+                                    discord_sent_via_tool.append((sent_channel, sent_content))
+                                    logger.info(f"📨 Tracked discord_send_message to channel {sent_channel}")
+
                             # Add tool response with size limiting to prevent context overflow
                             result_str = str(result)
                             max_tool_result_length = 1500  # Limit tool results to prevent context overflow
@@ -2637,6 +2646,9 @@ class JakeyBot(commands.Bot):
                             "content": assistant_content if assistant_content else "",
                             "tool_calls": sanitized_tool_calls,
                         }
+                        # DeepSeek thinking mode requires reasoning_content to be echoed back
+                        if ai_message.get("reasoning_content"):
+                            assistant_msg["reasoning_content"] = ai_message["reasoning_content"]
 
                         valid_messages.append(assistant_msg)
                         # Add the tool results
@@ -2957,6 +2969,33 @@ class JakeyBot(commands.Bot):
             # Sanitize response to remove any leaked tool call syntax
             ai_response = sanitize_ai_response(ai_response)
 
+            # Suppress follow-up text if discord_send_message already sent the same content
+            tool_sent_suppressed = False
+            if discord_sent_via_tool and ai_response:
+                current_channel_id = str(message.channel.id)
+                for sent_channel, sent_content in discord_sent_via_tool:
+                    if sent_channel == current_channel_id:
+                        # Check if the follow-up is substantially the same as what the tool sent
+                        resp_lower = ai_response.strip().lower()
+                        sent_lower = sent_content.strip().lower()
+                        # Suppress if they share 80%+ of their first 200 chars
+                        check_len = min(200, len(sent_lower), len(resp_lower))
+                        if check_len > 20 and resp_lower[:check_len] == sent_lower[:check_len]:
+                            logger.info(
+                                f"🚫 Suppressing duplicate follow-up (matches discord_send_message tool output)"
+                            )
+                            ai_response = ""
+                            tool_sent_suppressed = True
+                            break
+                        # Also suppress if response is a substring of what was sent
+                        if resp_lower and resp_lower in sent_lower:
+                            logger.info(
+                                f"🚫 Suppressing follow-up (is substring of tool-sent message)"
+                            )
+                            ai_response = ""
+                            tool_sent_suppressed = True
+                            break
+
             # Ensure generated image URLs are included in the response
             # The AI sometimes forgets to include them, so we append any missing ones
             if generated_image_urls:
@@ -2966,6 +3005,9 @@ class JakeyBot(commands.Bot):
                         logger.info(f"📸 Appended missing image URL to response")
 
             if not ai_response:
+                if tool_sent_suppressed:
+                    # The tool already sent the message — nothing more to do
+                    return
                 # Response was only tool call syntax with no actual message
                 logger.warning(
                     "AI response was empty after sanitization (contained only tool call syntax)"
