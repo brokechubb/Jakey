@@ -251,6 +251,16 @@ class OpenAICompatibleAPI:
             if tool_choice:
                 payload["tool_choice"] = tool_choice
 
+        # Increase timeout for requests with many tools (larger payloads)
+        current_timeout = self.timeout
+        if tools and len(tools) > 5:
+            current_timeout = min(
+                self.timeout * 2, 120
+            )
+            logger.debug(
+                f"OpenAI-Compatible: Increased timeout to {current_timeout}s for {len(tools)} tools"
+            )
+
         # Retry loop for transient errors
         max_retries = 3
         retry_delay = 1.0
@@ -265,7 +275,7 @@ class OpenAICompatibleAPI:
                     self.api_url,
                     headers=self._get_headers(),
                     json=payload,
-                    timeout=self.timeout,
+                    timeout=current_timeout,
                 )
 
                 if response.status_code == 200:
