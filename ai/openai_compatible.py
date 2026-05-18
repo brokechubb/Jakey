@@ -423,9 +423,25 @@ class OpenAICompatibleAPI:
                     return {"error": error_msg}
 
                 elif response.status_code == 429:
+                    retry_after = response.headers.get("retry-after")
+                    if retry_after:
+                        try:
+                            retry_after_secs = int(retry_after)
+                        except (ValueError, TypeError):
+                            retry_after_secs = 0
+                    else:
+                        retry_after_secs = 0
+
+                    if retry_after_secs > 120:
+                        logger.error(
+                            f"OpenAI-Compatible: Rate limited for {retry_after_secs}s ({retry_after_secs / 3600:.1f}h). "
+                            f"Skipping retries."
+                        )
+                        return {"error": f"Rate limit exceeded (retry-after: {retry_after_secs}s)", "rate_limited": True}
+
                     error_msg = "Rate limit exceeded"
                     if attempt < max_retries:
-                        sleep_time = retry_delay * (2 ** attempt) + random.uniform(0, 1)
+                        sleep_time = max(retry_after_secs, retry_delay * (2 ** attempt)) + random.uniform(0, 1)
                         logger.warning(
                             f"OpenAI-Compatible: Rate limited. Retrying in {sleep_time:.2f}s..."
                         )
