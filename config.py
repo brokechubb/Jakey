@@ -52,9 +52,9 @@ PRIMARY_MODEL = "gpt-oss-120b"
 
 # Fallback models tried in order if primary fails (also used for function calling)
 FALLBACK_MODELS = [
-    "kimi-k2-instruct",  # Reliable instruct model
-    "mistral-small-4",
-    "deepseek-v3.1",
+    "nvidia/nemotron-nano-9b-v2:free",
+    "google/gemma-4-26b-a4b-it:free",
+    "qwen/qwen3-coder:free",
 ]
 
 # Models for %models command display
