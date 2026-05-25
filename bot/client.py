@@ -2959,29 +2959,26 @@ class JakeyBot(commands.Bot):
             # Suppress follow-up text if discord_send_message already sent the same content
             tool_sent_suppressed = False
             if discord_sent_via_tool and ai_response:
-                current_channel_id = str(message.channel.id)
                 for sent_channel, sent_content in discord_sent_via_tool:
-                    if sent_channel == current_channel_id:
-                        # Check if the follow-up is substantially the same as what the tool sent
-                        resp_lower = ai_response.strip().lower()
-                        sent_lower = sent_content.strip().lower()
-                        # Suppress if they share 80%+ of their first 200 chars
-                        check_len = min(200, len(sent_lower), len(resp_lower))
-                        if check_len > 20 and resp_lower[:check_len] == sent_lower[:check_len]:
-                            logger.info(
-                                f"🚫 Suppressing duplicate follow-up (matches discord_send_message tool output)"
-                            )
-                            ai_response = ""
-                            tool_sent_suppressed = True
-                            break
-                        # Also suppress if response is a substring of what was sent
-                        if resp_lower and resp_lower in sent_lower:
-                            logger.info(
-                                f"🚫 Suppressing follow-up (is substring of tool-sent message)"
-                            )
-                            ai_response = ""
-                            tool_sent_suppressed = True
-                            break
+                    resp_lower = ai_response.strip().lower()
+                    sent_lower = sent_content.strip().lower()
+                    # Suppress if they share 80%+ of their first 200 chars
+                    check_len = min(200, len(sent_lower), len(resp_lower))
+                    if check_len > 20 and resp_lower[:check_len] == sent_lower[:check_len]:
+                        logger.info(
+                            f"🚫 Suppressing duplicate follow-up (matches discord_send_message tool output)"
+                        )
+                        ai_response = ""
+                        tool_sent_suppressed = True
+                        break
+                    # Also suppress if response is a substring of what was sent
+                    if resp_lower and resp_lower in sent_lower:
+                        logger.info(
+                            f"🚫 Suppressing follow-up (is substring of tool-sent message)"
+                        )
+                        ai_response = ""
+                        tool_sent_suppressed = True
+                        break
 
             # Ensure generated image URLs are included in the response
             # The AI sometimes forgets to include them, so we append any missing ones
