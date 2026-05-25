@@ -96,6 +96,10 @@ THINKING_BLOCK_PATTERNS = [
     re.compile(r"\[TARGET_[A-Z]+\].*?\[/TARGET_[A-Z]+\]", re.DOTALL | re.IGNORECASE),
     re.compile(r"\[RESPONSE_[A-Z]+\].*?\[/RESPONSE_[A-Z]+\]", re.DOTALL | re.IGNORECASE),
     re.compile(r"\[(?:OUTPUT|RESULT|STATUS|ACTION|INTENT)_[A-Z]+\].*?\[/(?:OUTPUT|RESULT|STATUS|ACTION|INTENT)_[A-Z]+\]", re.DOTALL | re.IGNORECASE),
+    # rnj-1 model: THOUGHT: ... blocks (internal reasoning)
+    re.compile(r"^THOUGHT:.*?(?=^THOUGHT:|^RESPONSE:|\Z)", re.DOTALL | re.MULTILINE | re.IGNORECASE),
+    # rnj-1 model: RESPONSE: prefix
+    re.compile(r"^RESPONSE:\s*", re.MULTILINE | re.IGNORECASE),
 ]
 
 RAW_FUNCTION_PATTERN = re.compile(r"\b[a-z_]+\s*\{[^}]*\}", re.IGNORECASE)
@@ -631,6 +635,16 @@ def sanitize_ai_response(response: str) -> str:
     # These are internal chain-of-thought that shouldn't be shown to users
     for pattern in THINKING_BLOCK_PATTERNS:
         sanitized = pattern.sub("", sanitized)
+
+    # Extract content from <message>...</message> tags (rnj-1 model format)
+    message_tag_match = re.search(r"<message>(.*?)</message>", sanitized, re.DOTALL)
+    if message_tag_match:
+        sanitized = message_tag_match.group(1).strip()
+    else:
+        # Also handle unclosed <message> tag
+        message_tag_match = re.search(r"<message>(.*)", sanitized, re.DOTALL)
+        if message_tag_match:
+            sanitized = message_tag_match.group(1).strip()
 
     # Remove [TOOL_CALLS] or similar patterns followed by function calls
     sanitized = TOOL_CALLS_PATTERN.sub("", sanitized)

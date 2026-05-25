@@ -85,6 +85,7 @@ MANDATORY_REASONING_MODELS = [
 # name is translated through this map. Unknown names fall back to
 # OPENROUTER_DEFAULT_MODEL.
 MODEL_NAME_MAP = {
+    "rnj-1": "deepseek/deepseek-v4-flash:free",
     "deepseek-v4-flash": "deepseek/deepseek-v4-flash:free",
     "gpt-oss-120b": "openai/gpt-oss-120b:free",
     "gpt-oss-20b": "openai/gpt-oss-20b:free",
