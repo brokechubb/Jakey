@@ -229,54 +229,45 @@ def setup_commands(bot):
  `%help` - Show this help message
  `%stats` - Show bot statistics and uptime
  `%time [timezone]` - Show current time and date (supports timezones)
- `%date [timezone]` - Show current date (alias for time command)
+ `%date [timezone]` - Show current date (alias for `%time`)
 
  **🧠 MEMORY COMMANDS:**
- `%memories [query]` - Search your memories that Jakey has saved from conversations
- `%remember <type> <info>` - Remember important information about you
- `%models` - List all available AI models
- `%imagemodels` - List all 49 artistic image styles
- `%aistatus` - Check Pollinations AI service status
-
- **🧠 MEMORY & USER COMMANDS:**
- `%friends` - List Jakey's friends (self-bot feature)
+ `%memories [query]` - Search your saved memories
+ `%remember <type> <info>` - Save information about you
  `%clearhistory [user]` - Clear conversation history for a user
-
- **🎭 REACTION ROLES:**
- `%show_gender_roles` - Show current gender role mappings
-
- **🎰 GAMBLING & FUN COMMANDS:**
- `%rigged` - Classic Jakey response
- `%wen <item>` - Get bonus schedule information (monthly, stake, shuffle, payout)
- `%keno [count]` - Generate random Keno numbers (1-10 numbers from 1-40, optional count parameter) with visual board
- `%ind_addr` - Generate a random Indian name and address
+ `%friends` - List Jakey's friends
 
  **🎨 AI & MEDIA COMMANDS:**
- `%image <prompt>` - Generate an image with artistic styles (supports 49 styles, 9 ratios)
+ `%image <prompt>` - Generate an image (49 styles, 9 ratios)
  `%audio <text>` - Generate audio from text using AI voices
- `%analyze <image_url> [prompt]` - Analyze an image (or attach an image)
+ `%analyze [url] [prompt]` - Analyze an image (URL or attachment)
 
- **🧠 TRIVIA DATABASE COMMANDS:**
+ **🎰 FUN COMMANDS:**
+ `%rigged` - Classic Jakey response
+ `%wen <item>` - Get bonus schedule information
+ `%keno [count]` - Generate random Keno numbers (1-10, 1-40)
+ `%ind_addr` - Generate a random Indian name and address
+
+ **🧠 TRIVIA COMMANDS:**
+ `%trivia [category]` - Start an interactive trivia game
  `%triviacats` - List all available trivia categories
  `%triviasearch <query> [category]` - Search trivia questions
 
  **💥 EXAMPLES:**
  `%time` - Current time in UTC
  `%time est` - Current time in US Eastern
- `%time Europe/London` - Current time in London
  `%remember favorite_team Dallas Cowboys`
- `%keno [count]` - Generate your lucky Keno numbers (optional count 1-10)
  `%image Fantasy Art a degenerate gambler at a casino`
  `%image 16:9 cinematic a slot machine winning big`
  `%analyze https://example.com/image.jpg What is in this image?`
  `%analyze` (with image attachment) - Analyze attached image
+ `%trivia sports` - Start a sports trivia game
 
- **⏰ REMINDER EXAMPLES (just ask Jakey):**
+ **⏰ REMINDERS (just ask Jakey):**
  `remind me in 2 hours to take a break`
- `set alarm for 8am tomorrow morning`
+ `set alarm for 8am tomorrow`
  `timer 25 minutes for pomodoro`
- `remind me next Friday at 3pm about the meeting`
- `check my reminders` - List all your pending reminders
+ `check my reminders` - List your pending reminders
  `cancel reminder 123` - Cancel a specific reminder
  """
 
@@ -307,55 +298,57 @@ def setup_commands(bot):
 
         help_text = """**💀 JAKEY ADMIN HELP 💀**
 
- **🤖 AI MANAGEMENT COMMANDS:**
+ **🤖 AI & MODEL COMMANDS:**
  `%model [model_name]` - Show or set current AI model
- `%fallbackstatus` - Show OpenRouter fallback restoration status
- `%queuestatus` - Show message queue status and statistics
+ `%models` - List all available models
+ `%imagemodels` - List all 49 artistic image styles
+ `%fallbackstatus` - Show OpenRouter fallback status
+ `%aistatus` - Check AI service status
+ `%queuestatus` - Show message queue status
  `%processqueue` - Manually trigger queue processing
+ `%clearstats` - Reset usage statistics
 
  **🧠 USER & CHANNEL COMMANDS:**
  `%userinfo [user]` - Get information about a user
  `%clearallhistory` - Clear ALL conversation history
  `%clearchannelhistory` - Clear conversation history for current channel
- `%clearmemories` - Clear all your stored memories (cannot be undone)
- `%memorystatus` - Show your memory statistics and system status
+ `%clearmemories` - Clear all your stored memories
+ `%memorystatus` - Show memory statistics and system status
  `%channelstats` - Show conversation statistics for current channel
 
  **🎭 REACTION ROLES:**
- `%add_reaction_role <message_id> <emoji> <@role>` - Add a reaction role to a message
- `%remove_reaction_role <message_id> <emoji>` - Remove a reaction role from a message
+ `%add_reaction_role <message_id> <emoji> <@role>` - Add a reaction role
+ `%remove_reaction_role <message_id> <emoji>` - Remove a reaction role
  `%list_reaction_roles` - List all reaction roles in the server
 
  **🚻 GENDER ROLES:**
- `%set_gender_roles <gender:role_id,...>` - Set gender role mappings (e.g., male:123456789,female:987654321)
+ `%set_gender_roles <gender:role_id,...>` - Set gender role mappings
  `%show_gender_roles` - Show current gender role mappings
 
  **🔑 KEYWORD COMMANDS:**
  `%add_keyword <keyword>` - Add a keyword Jakey will respond to
  `%remove_keyword <keyword>` - Remove a keyword
  `%enable_keyword <keyword>` - Enable a disabled keyword
- `%disable_keyword <keyword>` - Disable a keyword without removing it
+ `%disable_keyword <keyword>` - Disable a keyword
  `%list_keywords` - List all configured keywords
 
- **💰 TIP.CC COMMANDS:**
- `%tip <user> <amount> <currency> [message]` - Send a tip to a user
+ **💰 TIP & AIRDROP COMMANDS:**
+ `%tip <user> <amount> <currency> [message]` - Send a tip
+ `%bal` / `%bals` - Check balances
+ `%transactions [limit]` - Show recent transaction history
+ `%tipstats` - Show tip statistics and earnings
+ `%confirm` - Manually click Confirm on tip.cc messages
  `%airdrop <amount> <currency> [for] <duration>` - Create an airdrop
- `%bal` / `%bals` - Check tip.cc balances and auto-dismiss response
- `%confirm` - Manually click Confirm button on tip.cc confirmation messages
- `%transactions [limit]` - Show recent tip.cc transaction history
- `%tipstats` - Show tip.cc statistics and earnings
- `%airdropstatus` - Show current airdrop configuration and status
+ `%airdropstatus` - Show airdrop configuration and status
 
-  **🧠 TRIVIA COMMANDS:**
-  `%trivia [category]` - Start an interactive trivia game in the current channel
-  `%seedtrivia` - Seed trivia database from external sources
-  `%addtrivia <category> <question> <answer>` - Add custom trivia question
-  `%triviastats` - Show trivia database statistics and health
-
- **🔧 MISC COMMANDS:**
- `%models` - List all available AI models
- `%imagemodels` - List all 49 artistic image styles
- `%aistatus` - Check Pollinations AI service status
+ **🧠 TRIVIA COMMANDS:**
+ `%trivia [category]` - Start an interactive trivia game
+ `%seedtrivia` - Seed trivia database from external sources
+ `%addtrivia <category> <question> <answer>` - Add custom trivia question
+ `%triviastats` - Show trivia database statistics
+ `%triviatest` - Test trivia functionality
+ `%triviacats` - List available trivia categories
+ `%triviasearch <query> [category]` - Search trivia questions
  """
 
         # Split into multiple messages if too long
