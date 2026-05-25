@@ -808,41 +808,13 @@ def setup_commands(bot):
             if OPENAI_COMPAT_ENABLED:
                 compat_models = openai_compatible_api.list_models()
                 if compat_models:
-                    response += "**LOCAL MODELS** (OpenAI-Compatible)\n"
-                    response += f"*Endpoint: {openai_compatible_api.api_url.replace('/chat/completions', '')}*\n\n"
-                    
-                    # Recommended local models with tool support info
-                    recommended_local = [
-                        ("deepseek-v3.1", "Ollama Cloud — reliable tool support ✅"),
-                        ("deepseek-v3.1-cb", "SambaNova Free — tool support ✅"),
-                        ("deepseek-v3.2", "Nvidia NIM — tool support ✅"),
-                        ("deepseek-v4-flash", "OpenCode Go — tool support ✅"),
-                        ("kimi-k2", "Ollama Cloud — tool support ✅"),
-                        ("gpt-oss-120b", "Nvidia NIM — tool support ✅"),
-                        ("gpt-oss-20b", "Nvidia NIM — tool support ✅"),
-                        ("mistral-large-3", "Nvidia NIM — tool support ✅"),
-                        ("mistral-medium-3", "Nvidia NIM — tool support ✅"),
-                        ("mistral-small-4", "Nvidia NIM — tool support ✅"),
-                    ]
-                    
-                    response += "**✅ WORKING MODELS:**\n"
-                    for model, desc in recommended_local:
-                        if model in compat_models:
-                            response += f"`{model}` - {desc}\n"
-                    
-                    response += f"\n*Use `%model <name>` to switch*\n\n"
+                    response += "**Available Models:**\n\n"
+                    for m in compat_models:
+                        indicator = "✅" if m == bot.current_model else "  "
+                        response += f"{indicator} `{m}`\n"
+                    response += "\n*Use `%model <name>` to switch*"
                 else:
-                    response += "**LOCAL MODELS** - *Unavailable (connection failed)*\n\n"
-
-            # Show recommended OpenRouter models (commented out due to SSL issues)
-            # response += "**OPENROUTER MODELS**\n"
-            # response += "*Best for tool calling & conversation*\n\n"
-            # for model, desc in RECOMMENDED_MODELS:
-            #     response += f"`{model}` - {desc}\n"
-
-            response += "\n**Images:** `%image [style] <prompt>` - 49 styles via `%imagemodels`"
-            response += "\n**Switch:** `%model <name>` to change"
-            response += "\n\n*Note: OpenRouter models temporarily disabled in listings*"
+                    response += "*Unavailable (connection failed)*"
 
             await send_long_message(ctx.channel, response)
 
