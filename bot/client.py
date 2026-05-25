@@ -2373,7 +2373,7 @@ class JakeyBot(commands.Bot):
 
                 # Multi-round tool execution loop
                 tool_round = 0
-                max_tool_rounds = 5
+                max_tool_rounds = 10
                 # Note: generated_image_urls is defined in outer scope (line 1998)
                 used_research_tools = False  # Track if any research/search tools were used
                 RESEARCH_TOOLS = {"web_search", "company_research", "crawling"}
