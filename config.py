@@ -86,7 +86,17 @@ MANDATORY_REASONING_MODELS = [
 # OPENROUTER_DEFAULT_MODEL.
 MODEL_NAME_MAP = {
     "deepseek-v4-flash": "deepseek/deepseek-v4-flash:free",
-    "deepseek-v4-flash-free": "deepseek/deepseek-v4-flash:free",
+    "gpt-oss-120b": "openai/gpt-oss-120b:free",
+    "gpt-oss-20b": "openai/gpt-oss-20b:free",
+    "laguna-m1": "poolside/laguna-m.1:free",
+    "llama-3.3-70b": "meta-llama/llama-3.3-70b-instruct:free",
+    "minimax-m2.5": "minimax/minimax-m2.5:free",
+    "nemotron-3-nano": "nvidia/nemotron-3-nano-30b-a3b:free",
+    "nemotron-3-nano-omni": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+    "nemotron-3-super": "nvidia/nemotron-3-super-120b-a12b:free",
+    "nemotron-3-super-120b": "nvidia/nemotron-3-super-120b-a12b:free",
+    "nemotron-nano-12b-vl": "nvidia/nemotron-nano-12b-v2-vl:free",
+    "qwen3-next": "qwen/qwen3-next-80b-a3b-instruct:free",
 }
 
 # Backwards compatibility aliases
