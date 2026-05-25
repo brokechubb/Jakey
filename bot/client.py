@@ -2042,6 +2042,13 @@ class JakeyBot(commands.Bot):
             # Prepare the message for AI processing
             user_content = message.content.strip()
             
+            # Replace user mentions with usernames so the AI doesn't confuse
+            # other users' mentions with itself
+            if message.mentions:
+                for mentioned_user in message.mentions:
+                    user_content = user_content.replace(f'<@{mentioned_user.id}>', f'@{mentioned_user.name}')
+                    user_content = user_content.replace(f'<@!{mentioned_user.id}>', f'@{mentioned_user.name}')
+            
             # If message is empty but has embeds, use embed content
             if not user_content and hasattr(message, 'embeds') and message.embeds:
                 embed_parts = []
@@ -3284,6 +3291,11 @@ class JakeyBot(commands.Bot):
                 if msg.author == self.user:
                     author_name = "Jakey (me)"
                 content = msg.content[:150]  # Truncate long messages
+                # Replace mentions with usernames so AI doesn't confuse them
+                if msg.mentions:
+                    for mentioned_user in msg.mentions:
+                        content = content.replace(f'<@{mentioned_user.id}>', f'@{mentioned_user.name}')
+                        content = content.replace(f'<@!{mentioned_user.id}>', f'@{mentioned_user.name}')
                 if content:  # Only include non-empty messages
                     messages.append(f"[{timestamp}] {author_name}: {content}")
 
