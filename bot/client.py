@@ -993,10 +993,6 @@ class JakeyBot(commands.Bot):
         self.wen_cooldown_duration = 600  # seconds (10 minutes)
         self._last_wen_cleanup = 0  # timestamp of last cleanup
 
-        # Model capabilities cache for dynamic tool support checking
-        self._model_capabilities = {}  # model_name -> capabilities_dict
-        self._model_cache_time = 0  # timestamp when cache was last updated
-
         # Initialize gender role manager
         from utils.gender_roles import initialize_gender_role_manager
 
@@ -1004,7 +1000,6 @@ class JakeyBot(commands.Bot):
         self.user_response_history = {}  # user_id -> deque of recent responses
 
         initialize_gender_role_manager(self)
-        self._model_cache_duration = 3600  # cache for 1 hour
 
     def _get_user_lock(self) -> asyncio.Lock:
         """Get or create the user rate limit lock (lazy initialization)."""
@@ -1058,121 +1053,9 @@ class JakeyBot(commands.Bot):
                     self._user_request_counts.get(user_id, 0) + 1
                 )
 
-    def clear_model_cache(self):
-        """Force clear the model capabilities cache"""
-        self._model_capabilities = {}
-        self._model_cache_time = 0
-        logger.info("Model capabilities cache cleared")
-
     def _model_supports_tools(self, model_name: Optional[str]) -> bool:
-        """Dynamically check if a model supports tools using API data"""
-        if not model_name:
-            return False
-
-        current_time = time.time()
-
-        # Update cache if it's too old or if we need to force refresh
-        if (
-            current_time - self._model_cache_time > self._model_cache_duration
-            or not self._model_capabilities
-        ):
-            try:
-                self._model_capabilities = {}
-
-                # Get models from OpenRouter
-                try:
-                    openrouter_models = openrouter_api.list_models()
-                    for model_id in openrouter_models:
-                        self._model_capabilities[model_id] = {
-                            "provider": "openrouter",
-                            "name": model_id,
-                        }
-                except Exception as e:
-                    logger.warning(f"Failed to fetch OpenRouter models: {e}")
-
-                self._model_cache_time = current_time
-                logger.info(
-                    f"Updated model capabilities cache with {len(self._model_capabilities)} models from multiple providers"
-                )
-            except Exception as e:
-                logger.error(f"Failed to update model capabilities cache: {e}")
-                # Fallback to basic models (OpenRouter free models only)
-                model_key = model_name.strip().lower()
-                return model_key in FALLBACK_MODELS
-
-        # Check if model supports tools from cache
-        model_key = model_name.strip().lower()
-        
-        # Blacklist: Models known to have issues with function calling
-        # These models produce garbled output when sent tool definitions
-        tool_broken_models = [
-            "qwen3-coder-flash",  # Produces garbage with tools
-            "deepseek-v3",  # Has issues with 42+ tools
-            "glm4.5-air",  # Better without tools
-        ]
-        if model_key in tool_broken_models:
-            logger.info(f"Model '{model_key}' is blacklisted from using tools")
-            return False
-        
-        # Special case: Known models that support tools regardless of API data
-        # Models confirmed working on the local endpoint
-        trusted_tool_models = [
-            "deepseek-v3.1",       # Ollama Cloud
-            "deepseek-v3.1-cb",    # SambaNova Free
-            "deepseek-v3.2",       # Nvidia NIM
-            "deepseek-v4-flash",   # OpenCode Go
-            "kimi-k2",             # Ollama Cloud
-            "gpt-oss-120b",        # Nvidia NIM
-            "gpt-oss-20b",         # Nvidia NIM
-            "mistral-large-3",     # Nvidia NIM
-            "mistral-medium-3",    # Nvidia NIM
-            "mistral-small-4",     # Nvidia NIM
-        ]
-        if model_key in trusted_tool_models:
-            logger.debug(f"Model '{model_key}' is in trusted tool models list")
-            return True
-
-        model_info = self._model_capabilities.get(model_key)
-        if model_info and isinstance(model_info, dict):
-            # For OpenRouter models, assume tool support based on model name patterns
-            if model_info.get("provider") == "openrouter":
-                model_lower = model_name.strip().lower()
-                tool_capable_keywords = [
-                    "instruct",
-                    "chat",
-                    "gpt",
-                    "claude",
-                    "llama",
-                    "mistral",
-                    "deepseek",
-                    "nemotron",
-                    "qwen",
-                    "longcat",
-                ]
-                return any(keyword in model_lower for keyword in tool_capable_keywords)
-            # For other providers, check the tools flag
-            return bool(model_info.get("tools", False))
-
-        # Fallback to basic check if model not in cache
-        model_lower = model_name.strip().lower()
-        # Check for known tool-capable models by pattern
-        tool_capable_keywords = [
-            "instruct",
-            "chat",
-            "gpt",
-            "claude",
-            "llama",
-            "mistral",
-            "deepseek",
-            "nemotron",
-            "qwen",
-            "longcat",
-        ]
-        if any(keyword in model_lower for keyword in tool_capable_keywords):
-            return True
-
-        # Final hardcoded fallback (OpenRouter free models only)
-        return model_lower in FALLBACK_MODELS
+        """Check if a model supports tools — always True (no restrictions)."""
+        return bool(model_name)
 
     def _filter_tools_for_message(self, all_tools: list, message_content: str) -> list:
         """

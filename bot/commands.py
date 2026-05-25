@@ -3005,21 +3005,4 @@ def setup_commands(bot):
         except Exception as e:
             await ctx.send(handle_command_error(e, ctx, "trivia"))
 
-    # ==========================================
-    # CLEAR CACHE COMMAND (1 command)
-    # ==========================================
-
-    @bot.command(name="clearcache")
-    async def clearcache(ctx):
-        """Clear the model capabilities cache (admin only)"""
-        if not is_admin(ctx.author.id):
-            await ctx.send("❌ This command is for admins only.")
-            return
-
-        try:
-            bot.clear_model_cache()
-            await ctx.send("✅ Model capabilities cache cleared successfully.")
-        except Exception as e:
-            await ctx.send(f"❌ Failed to clear cache: {str(e)}")
-
-    logger.info("All 35 commands registered")
+    logger.info("All commands registered")
