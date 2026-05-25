@@ -636,15 +636,8 @@ def sanitize_ai_response(response: str) -> str:
     for pattern in THINKING_BLOCK_PATTERNS:
         sanitized = pattern.sub("", sanitized)
 
-    # Extract content from <message>...</message> tags (rnj-1 model format)
-    message_tag_match = re.search(r"<message>(.*?)</message>", sanitized, re.DOTALL)
-    if message_tag_match:
-        sanitized = message_tag_match.group(1).strip()
-    else:
-        # Also handle unclosed <message> tag
-        message_tag_match = re.search(r"<message>(.*)", sanitized, re.DOTALL)
-        if message_tag_match:
-            sanitized = message_tag_match.group(1).strip()
+    # Strip <message> and </message> tags (rnj-1 model format wraps response in them)
+    sanitized = re.sub(r"</?message>", "", sanitized, flags=re.IGNORECASE)
 
     # Remove [TOOL_CALLS] or similar patterns followed by function calls
     sanitized = TOOL_CALLS_PATTERN.sub("", sanitized)
