@@ -636,8 +636,8 @@ def sanitize_ai_response(response: str) -> str:
     for pattern in THINKING_BLOCK_PATTERNS:
         sanitized = pattern.sub("", sanitized)
 
-    # Strip <message> and </message> tags (rnj-1 model format wraps response in them)
-    sanitized = re.sub(r"</?message>", "", sanitized, flags=re.IGNORECASE)
+    # Strip <message>, <response>, and </message>, </response> tags (rnj-1 model format)
+    sanitized = re.sub(r"</?(?:message|response)>", "", sanitized, flags=re.IGNORECASE)
 
     # Remove [TOOL_CALLS] or similar patterns followed by function calls
     sanitized = TOOL_CALLS_PATTERN.sub("", sanitized)
