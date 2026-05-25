@@ -356,7 +356,6 @@ def setup_commands(bot):
  `%models` - List all available AI models
  `%imagemodels` - List all 49 artistic image styles
  `%aistatus` - Check Pollinations AI service status
- `%clearcache` - Clear the model capabilities cache
  """
 
         # Split into multiple messages if too long
