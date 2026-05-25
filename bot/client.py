@@ -114,6 +114,22 @@ SEARCH_FUNCTION_PATTERN = re.compile(
     r"\bsearch_\w+\s*\{.*?\}", re.DOTALL | re.IGNORECASE
 )
 PYTHON_CALL_PATTERN = re.compile(r"\b\w+\s*\([^)]*\)", re.IGNORECASE)
+# DeepSeek v3.1/v3.2 style: (tool_name key="value" ...) — function name INSIDE parens
+PAREN_KW_CALL_PATTERN = re.compile(
+    r'\(([a-z][a-z0-9_]+)\s+((?:[a-z_]\w*\s*=\s*(?:"[^"]*"|\'[^\']*\'|[^\s,)]+)(?:\s*,\s*|\s+)?)+)\)',
+    re.IGNORECASE,
+)
+# DeepSeek DSML format: <｜DSML｜function_calls><｜DSML｜invoke name="tool">...<｜DSML｜parameter name="k">v</｜DSML｜parameter></｜DSML｜invoke></｜DSML｜function_calls>
+_DSML_PFX = "｜DSML｜"  # ｜DSML｜ full-width pipes
+DSML_FUNCTION_CALLS_PATTERN = re.compile(
+    r"<｜DSML｜function_calls>\s*<｜DSML｜invoke\s+name=[\"']([^\"']+)[\"'][^>]*>"
+    r"\s*(.*?)\s*</｜DSML｜invoke>\s*</｜DSML｜function_calls>",
+    re.DOTALL | re.IGNORECASE,
+)
+DSML_PARAMETER_PATTERN = re.compile(
+    r"<｜DSML｜parameter\s+name=[\"']([^\"']+)[\"'][^>]*>([^<]*)</｜DSML｜parameter>",
+    re.DOTALL | re.IGNORECASE,
+)
 JSON_TOOL_CALL_PATTERN = re.compile(
     r'\{[^}]*["\']type["\']\s*:\s*["\']function["\'][^{]*(?:\{[^}]*\})?[^}]*\}',
     re.DOTALL | re.IGNORECASE,
@@ -464,6 +480,91 @@ def extract_text_tool_calls(ai_response: str) -> Tuple[List[Dict], str]:
         if all_tool_calls:
             return all_tool_calls, cleaned_response
 
+    # Try DeepSeek v3.1/v3.2 style: (tool_name key="value" ...) — parens wrap function name + kwargs
+    paren_kw_matches = list(PAREN_KW_CALL_PATTERN.finditer(ai_response))
+    if paren_kw_matches:
+        for match in paren_kw_matches:
+            try:
+                function_name = match.group(1)
+                params_str = match.group(2)
+
+                if function_name not in valid_tool_names:
+                    logging.getLogger(__name__).debug(
+                        f"Paren-kw call '{function_name}' not in valid tools, ignoring"
+                    )
+                    continue
+
+                parameters = {}
+                param_pairs = re.findall(
+                    r'([a-z_]\w*)\s*=\s*(?:"([^"]*)"|\'([^\']*)\'|([^\s,)]+))',
+                    params_str,
+                    re.IGNORECASE,
+                )
+                for key, dq_val, sq_val, bare_val in param_pairs:
+                    value = dq_val or sq_val or bare_val
+                    try:
+                        parameters[key] = int(value) if "." not in value else float(value)
+                    except (ValueError, TypeError):
+                        parameters[key] = value.strip()
+
+                tool_call = {
+                    "id": f"manual_{int(time.time())}_{len(all_tool_calls)}",
+                    "type": "function",
+                    "function": {"name": function_name, "arguments": parameters},
+                }
+                all_tool_calls.append(tool_call)
+                logging.getLogger(__name__).info(
+                    f"Extracted paren-kw tool call: {function_name}({parameters})"
+                )
+            except Exception as e:
+                logging.getLogger(__name__).debug(f"Failed to parse paren-kw tool call: {e}")
+                continue
+
+        cleaned_response = PAREN_KW_CALL_PATTERN.sub("", cleaned_response).strip()
+
+        if all_tool_calls:
+            return all_tool_calls, cleaned_response
+
+    # Try DeepSeek DSML format: <｜DSML｜function_calls><｜DSML｜invoke name="tool">...</｜DSML｜invoke></｜DSML｜function_calls>
+    dsml_matches = list(DSML_FUNCTION_CALLS_PATTERN.finditer(ai_response))
+    if dsml_matches:
+        for match in dsml_matches:
+            try:
+                function_name = match.group(1)
+                params_block = match.group(2)
+
+                if function_name not in valid_tool_names:
+                    logging.getLogger(__name__).debug(
+                        f"DSML tool '{function_name}' not in valid tools, ignoring"
+                    )
+                    continue
+
+                parameters = {}
+                for param_name, param_value in DSML_PARAMETER_PATTERN.findall(params_block):
+                    value = param_value.strip()
+                    try:
+                        parameters[param_name] = int(value) if "." not in value else float(value)
+                    except (ValueError, TypeError):
+                        parameters[param_name] = value
+
+                tool_call = {
+                    "id": f"manual_{int(time.time())}_{len(all_tool_calls)}",
+                    "type": "function",
+                    "function": {"name": function_name, "arguments": parameters},
+                }
+                all_tool_calls.append(tool_call)
+                logging.getLogger(__name__).info(
+                    f"Extracted DSML tool call: {function_name}({parameters})"
+                )
+            except Exception as e:
+                logging.getLogger(__name__).debug(f"Failed to parse DSML tool call: {e}")
+                continue
+
+        cleaned_response = DSML_FUNCTION_CALLS_PATTERN.sub("", cleaned_response).strip()
+
+        if all_tool_calls:
+            return all_tool_calls, cleaned_response
+
     # Try bare JSON objects (no function name, just raw parameters)
     bare_json_matches = list(BARE_JSON_OBJECT_PATTERN.finditer(ai_response))
     if bare_json_matches:
@@ -551,6 +652,10 @@ def sanitize_ai_response(response: str) -> str:
     sanitized = URL_QUERY_PATTERN.sub("", sanitized)
     # Remove Python function call format (e.g., play_trivia(channel_id=123))
     sanitized = PYTHON_CALL_PATTERN.sub("", sanitized)
+    # Remove DeepSeek paren-kw format (e.g., (web_search query="..."))
+    sanitized = PAREN_KW_CALL_PATTERN.sub("", sanitized)
+    # Remove DeepSeek DSML format (<｜DSML｜function_calls>...</｜DSML｜function_calls>)
+    sanitized = DSML_FUNCTION_CALLS_PATTERN.sub("", sanitized)
 
     # Remove JSON-formatted tool calls: {"type": "function", "name": "...", "parameters": {...}}
     sanitized = JSON_TOOL_CALL_PATTERN.sub("", sanitized)
@@ -2646,11 +2751,21 @@ class JakeyBot(commands.Bot):
 
                         # Force "none" on final round to prevent infinite loops
                         is_final_round = tool_round >= max_tool_rounds - 1
-                        current_tool_choice = "none" if is_final_round else "auto"
+                        # Also force "none" if discord_send_message was just called — prevents
+                        # the model from spamming the channel with multiple tool-sent messages
+                        sent_message_this_round = any(
+                            tc.get("function", {}).get("name") == "discord_send_message"
+                            for tc in tool_calls
+                        )
+                        current_tool_choice = "none" if (is_final_round or sent_message_this_round) else "auto"
 
                         if is_final_round:
                             logger.info(
                                 f"⚠️ Final tool round - forcing tool_choice='none' to stop loop"
+                            )
+                        if sent_message_this_round:
+                            logger.info(
+                                f"⚠️ discord_send_message used — forcing tool_choice='none' to prevent multi-send loop"
                             )
 
                         # Research tools get more tokens and relaxed brevity.
@@ -2744,7 +2859,9 @@ class JakeyBot(commands.Bot):
                             tool_calls = ai_message.get("tool_calls", [])
 
                             # Check for text-based tool calls again (defensive)
-                            if not tool_calls and ai_response:
+                            # Skip entirely if we forced tool_choice='none' — respect the constraint
+                            # even when the model embeds DSML/paren-kw syntax in its text response.
+                            if not tool_calls and ai_response and current_tool_choice != "none":
                                 extracted_calls, cleaned_response = (
                                     extract_text_tool_calls(ai_response)
                                 )
@@ -2755,11 +2872,11 @@ class JakeyBot(commands.Bot):
                                         f"✅ Converted text-based tool call in loop"
                                     )
 
-                            # SAFETY: If this was the final round (forced "none") but model still returned tools,
-                            # we MUST ignore them to break the loop and use whatever text we have.
-                            if is_final_round and tool_calls:
+                            # SAFETY: If we forced tool_choice='none' (final round OR after discord_send_message)
+                            # but model still returned API-level tool calls, ignore them to break the loop.
+                            if (is_final_round or current_tool_choice == "none") and tool_calls:
                                 logger.warning(
-                                    f"⚠️ Model ignored tool_choice='none' in final round. Ignoring {len(tool_calls)} tool calls to prevent loop."
+                                    f"⚠️ Model ignored tool_choice='none' (final_round={is_final_round}). Ignoring {len(tool_calls)} tool calls to prevent loop."
                                 )
                                 tool_calls = []
                                 # If content is empty, provide a fallback message
@@ -2978,9 +3095,11 @@ class JakeyBot(commands.Bot):
 
             # Ensure generated image URLs are included in the response
             # The AI sometimes forgets to include them, so we append any missing ones
+            # Skip if the URL was already sent via discord_send_message tool
             if generated_image_urls:
+                tool_sent_text = " ".join(content for _, content in discord_sent_via_tool)
                 for url in generated_image_urls:
-                    if url not in ai_response:
+                    if url not in ai_response and url not in tool_sent_text:
                         ai_response = ai_response.rstrip() + "\n\n" + url
                         logger.info(f"📸 Appended missing image URL to response")
 

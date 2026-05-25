@@ -440,14 +440,7 @@ class OpenAICompatibleAPI:
                         return {"error": f"Rate limit exceeded (retry-after: {retry_after_secs}s)", "rate_limited": True}
 
                     error_msg = "Rate limit exceeded"
-                    if attempt < max_retries:
-                        sleep_time = max(retry_after_secs, retry_delay * (2 ** attempt)) + random.uniform(0, 1)
-                        logger.warning(
-                            f"OpenAI-Compatible: Rate limited. Retrying in {sleep_time:.2f}s..."
-                        )
-                        time.sleep(sleep_time)
-                        continue
-                    logger.error(f"OpenAI-Compatible: {error_msg} - Max retries reached")
+                    logger.warning(f"OpenAI-Compatible: Rate limited. Failing over immediately.")
                     return {"error": error_msg, "rate_limited": True}
 
                 elif response.status_code in (500, 502, 503, 504):

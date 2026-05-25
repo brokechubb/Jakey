@@ -726,24 +726,12 @@ def setup_commands(bot):
         from config import OPENAI_COMPAT_DEFAULT_MODEL, OPENAI_COMPAT_ENABLED
 
         if model_name is None:
-            # Show current models for both providers
-            response = "**Current Models:**\n"
-
-            # Show local model if enabled
-            if OPENAI_COMPAT_ENABLED:
-                local_model = (
-                    bot.local_model
-                    if hasattr(bot, "local_model")
-                    else OPENAI_COMPAT_DEFAULT_MODEL
-                )
-                response += f"**Local:** `{local_model}`\n"
-
-            # Show OpenRouter model
-            openrouter_model = (
-                bot.current_model if hasattr(bot, "current_model") else "Not set"
+            current = (
+                bot.current_model
+                if hasattr(bot, "current_model") and bot.current_model
+                else OPENAI_COMPAT_DEFAULT_MODEL
             )
-            response += f"**OpenRouter:** `{openrouter_model}`\n"
-
+            response = f"**Current Model:** `{current}`\n"
             response += "\nUse `%model <model_name>` to change."
             response += "\nUse `%models` to see available models."
             await ctx.send(response)
@@ -759,7 +747,7 @@ def setup_commands(bot):
                 try:
                     compat_models = openai_compatible_api.list_models()
                     if model_name in compat_models:
-                        bot.local_model = model_name
+                        bot.current_model = model_name
                         model_set = True
                         provider_name = "Local"
                         logger.info(

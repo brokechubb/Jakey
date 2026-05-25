@@ -336,12 +336,7 @@ class SimpleAIProviderManager:
                 request_start = time.time()
 
                 if provider_name == "openai_compatible":
-                    # Use provider-specific model for OpenAI-compatible endpoint
-                    # Don't pass OpenRouter model names to local endpoint
-                    compat_model = None  # Let the provider use its default
-                    if model and not model.endswith(":free") and "/" not in model:
-                        # Only pass simple model names (not OpenRouter format)
-                        compat_model = model
+                    compat_model = model
 
                     result = await asyncio.to_thread(
                         self.openai_compat_api.generate_text,
