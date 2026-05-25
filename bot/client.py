@@ -1647,10 +1647,10 @@ class JakeyBot(commands.Bot):
     async def on_ready(self):
         """Called when the bot is ready"""
         # Set current model to default if not already set
-        from config import OPENROUTER_DEFAULT_MODEL
+        from config import OPENAI_COMPAT_DEFAULT_MODEL
 
         if self.current_model is None:
-            self.current_model = OPENROUTER_DEFAULT_MODEL
+            self.current_model = OPENAI_COMPAT_DEFAULT_MODEL
 
         # Register commands only once
         if not self._commands_loaded:

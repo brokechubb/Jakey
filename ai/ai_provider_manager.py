@@ -13,6 +13,7 @@ from config import (
     DISABLE_REASONING_MODELS,
     FALLBACK_MODELS,
     MAX_CONVERSATION_TOKENS,
+    MODEL_NAME_MAP,
     OPENAI_COMPAT_DEFAULT_MODEL,
     OPENAI_COMPAT_ENABLED,
     OPENROUTER_DEFAULT_MODEL,
@@ -349,10 +350,15 @@ class SimpleAIProviderManager:
                         **api_kwargs,
                     )
                 else:  # openrouter
+                    # Translate local model names to OpenRouter naming
+                    or_model = model
+                    if or_model and "/" not in or_model:
+                        or_model = MODEL_NAME_MAP.get(or_model, OPENROUTER_DEFAULT_MODEL)
+
                     result = await asyncio.to_thread(
                         self.openrouter_api.generate_text,
                         messages=messages,
-                        model=model,
+                        model=or_model,
                         temperature=temperature,
                         max_tokens=max_tokens,
                         tools=tools,

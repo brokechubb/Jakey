@@ -79,6 +79,16 @@ MANDATORY_REASONING_MODELS = [
     "nvidia/nemotron-nano-12b-v2-vl:free",
 ]
 
+# Map local model names → OpenRouter names for correct fallback
+# Local and OpenRouter endpoints use different naming conventions.
+# When the local API fails and we fall back to OpenRouter, the model
+# name is translated through this map. Unknown names fall back to
+# OPENROUTER_DEFAULT_MODEL.
+MODEL_NAME_MAP = {
+    "deepseek-v4-flash": "deepseek/deepseek-v4-flash:free",
+    "deepseek-v4-flash-free": "deepseek/deepseek-v4-flash:free",
+}
+
 # Backwards compatibility aliases
 OPENROUTER_DEFAULT_MODEL = os.getenv("OPENROUTER_DEFAULT_MODEL", PRIMARY_MODEL)
 WEB_SEARCH_MODEL = PRIMARY_MODEL
