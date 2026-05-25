@@ -801,7 +801,7 @@ def setup_commands(bot):
                 compat_models = openai_compatible_api.list_models()
                 if compat_models:
                     response += "**Available Models:**\n\n"
-                    for m in compat_models:
+                    for m in sorted(compat_models):
                         indicator = "✅" if m == bot.current_model else "  "
                         response += f"{indicator} `{m}`\n"
                     response += "\n*Use `%model <name>` to switch*"
