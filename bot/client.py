@@ -2563,7 +2563,7 @@ class JakeyBot(commands.Bot):
 
                             # Add tool response with size limiting to prevent context overflow
                             result_str = str(result)
-                            max_tool_result_length = 1500  # Limit tool results to prevent context overflow
+                            max_tool_result_length = 2000  # Limit tool results to prevent context overflow
                             if len(result_str) > max_tool_result_length:
                                 result_str = result_str[:max_tool_result_length] + "\n\n[Result truncated due to length - too much data for AI context]"
                                 logger.info(f"Tool result truncated from {len(str(result))} to {max_tool_result_length} chars")
