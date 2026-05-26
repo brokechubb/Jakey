@@ -356,6 +356,55 @@ def extract_text_tool_calls(ai_response: str) -> Tuple[List[Dict], str]:
         if all_tool_calls:
             return all_tool_calls, cleaned_response
 
+    # Try cogito-style format: <|tool▁candidate▁N|>tool_name\n```json\n{args}\n```<|tool▁cope|>
+    # Two variants: with tool name (case 1) or just JSON with no tool name (case 2)
+    TOOL_CANDIDATE_PATTERN = re.compile(
+        r"<\|tool▁candidate▁\d+\|>\s*(?:(\w+)\s*)?```json\s*(\{.*?\})\s*```\s*(?:<\|tool▁cope\|>)?",
+        re.DOTALL | re.IGNORECASE,
+    )
+    candidate_matches = list(TOOL_CANDIDATE_PATTERN.finditer(ai_response))
+    if candidate_matches:
+        for match in candidate_matches:
+            try:
+                function_name = match.group(1)  # May be None if no tool name
+                parameters_str = match.group(2)
+                parameters = json.loads(parameters_str)
+
+                # If tool name was provided, validate and use it
+                if function_name:
+                    if function_name not in valid_tool_names:
+                        logging.getLogger(__name__).debug(
+                            f"Extracted function '{function_name}' not in valid tools, ignoring"
+                        )
+                        continue
+                    tool_call = {
+                        "id": f"manual_{int(time.time())}_{len(all_tool_calls)}",
+                        "type": "function",
+                        "function": {"name": function_name, "arguments": parameters},
+                    }
+                    all_tool_calls.append(tool_call)
+                else:
+                    # No tool name — try bare JSON matching
+                    tool_schemas = _get_tool_schemas_map()
+                    result = _match_bare_json_to_tool(parameters, tool_schemas)
+                    if result:
+                        function_name, matched_params = result
+                        tool_call = {
+                            "id": f"manual_{int(time.time())}_{len(all_tool_calls)}",
+                            "type": "function",
+                            "function": {"name": function_name, "arguments": matched_params},
+                        }
+                        all_tool_calls.append(tool_call)
+            except (json.JSONDecodeError, IndexError, Exception) as e:
+                logging.getLogger(__name__).debug(f"Failed to parse tool candidate call: {e}")
+                continue
+
+        # Remove all tool candidate blocks from response
+        cleaned_response = TOOL_CANDIDATE_PATTERN.sub("", cleaned_response).strip()
+
+        if all_tool_calls:
+            return all_tool_calls, cleaned_response
+
     # Try URL query string format (e.g., web_search?q=...) - extract ALL matches
     url_matches = list(URL_QUERY_PATTERN.finditer(ai_response))
     if url_matches:
@@ -663,6 +712,14 @@ def sanitize_ai_response(response: str) -> str:
     sanitized = PAREN_KW_CALL_PATTERN.sub("", sanitized)
     # Remove DeepSeek DSML format (<｜DSML｜function_calls>...</｜DSML｜function_calls>)
     sanitized = DSML_FUNCTION_CALLS_PATTERN.sub("", sanitized)
+
+    # Remove cogito-style tool candidate format: <|tool▁candidate▁N|>tool_name\n```json\n{args}\n```<|tool▁cope|>
+    sanitized = re.sub(
+        r"<\|tool▁candidate▁\d+\|>.*?(?:```\s*<\|tool▁cope\|>|<\|tool▁cope\|>|```)",
+        "",
+        sanitized,
+        flags=re.DOTALL | re.IGNORECASE,
+    ).strip()
 
     # Remove JSON-formatted tool calls: {"type": "function", "name": "...", "parameters": {...}}
     sanitized = JSON_TOOL_CALL_PATTERN.sub("", sanitized)
