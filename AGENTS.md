@@ -484,6 +484,12 @@ if not model_supports_tools:
 **Blacklist** (no tools): `qwen3-coder-flash`, `deepseek-v3`, `glm4.5-air`  
 **Whitelist** (full tools): `qwen3-coder-plus`, `qwen3-max`, `gemini-2.5-flash`
 
+### Special Cases: Text-Embedded Tool Calls
+
+Some models output tool calls as text instead of using the API `tool_calls` field. These are still extracted and executed:
+
+- **`cogito-2.1`** — Uses `<|tool▁candidate▁N|>tool_name\n```json\n{args}\n```<|tool▁cope|>` format. Extracted by `TOOL_CANDIDATE_PATTERN` in `extract_text_tool_calls`.
+
 ### Model Commands
 
 - **View available models**: `%models` - Shows recommended models with tool support indicators
