@@ -3167,6 +3167,7 @@ class JakeyBot(commands.Bot):
         except Exception as e:
             # Silent fail - don't expose automation errors to Discord
             logger.error(f"Error in process_jakey_response: {e}")
+            logger.error(f"Full traceback: {traceback.format_exc()}")
 
     def _split_long_message(self, text: str, max_length: int = 1990) -> list:
         """Split a long message into multiple parts at natural boundaries."""
