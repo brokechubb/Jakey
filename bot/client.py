@@ -480,8 +480,6 @@ def extract_text_tool_calls(ai_response: str) -> Tuple[List[Dict], str]:
                     # Parse parameters (key=value format, comma-separated)
                     parameters = {}
                     if params_str:
-                        import re
-
                         # First try key=value pairs
                         param_pairs = re.findall(
                             r'(\w+)=["\']?([^"\',\)]+)["\']?', params_str
