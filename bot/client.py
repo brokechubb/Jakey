@@ -1061,8 +1061,21 @@ class JakeyBot(commands.Bot):
                 )
 
     def _model_supports_tools(self, model_name: Optional[str]) -> bool:
-        """Check if a model supports tools — always True (no restrictions)."""
-        return bool(model_name)
+        """Check if a model supports tools — returns False for models known to not support function calling."""
+        if not model_name:
+            return False
+        TOOL_BLACKLIST = {
+            "cogito-2.1",
+            "qwen3-coder-flash",
+            "deepseek-v3",
+            "glm4.5-air",
+        }
+        # Check if model name (or any part of it) is in the blacklist
+        model_lower = model_name.lower()
+        for blacklisted in TOOL_BLACKLIST:
+            if blacklisted in model_lower:
+                return False
+        return True
 
     def _filter_tools_for_message(self, all_tools: list, message_content: str) -> list:
         """
@@ -2034,6 +2047,7 @@ class JakeyBot(commands.Bot):
             if hasattr(self, 'tool_manager') and self.tool_manager:
                 self.tool_manager._in_dm_context = is_dm
                 self.tool_manager._dm_channel_id = str(message.channel.id) if is_dm else None
+                self.tool_manager._current_guild_id = str(message.guild.id) if message.guild else None
 
             # Use global AI provider manager singleton
             if not hasattr(self, "_ai_manager"):
@@ -4140,6 +4154,8 @@ class JakeyBot(commands.Bot):
 
     async def on_member_join(self, member):
         """Handle new member joining a server - send welcome message if enabled."""
+        logger.info(f"on_member_join fired: {member.name} (id={member.id}) in guild {member.guild.name} (id={member.guild.id})")
+
         # Import config values at runtime to allow patching in tests
         from config import (
             WELCOME_CHANNEL_IDS,
@@ -4150,10 +4166,12 @@ class JakeyBot(commands.Bot):
 
         # Check if welcome feature is enabled
         if not WELCOME_ENABLED:
+            logger.info(f"Welcome disabled, skipping for {member.name}")
             return
 
         # Check if this server is configured for welcome messages
         if str(member.guild.id) not in WELCOME_SERVER_IDS:
+            logger.info(f"Guild {member.guild.id} not in WELCOME_SERVER_IDS {WELCOME_SERVER_IDS}, skipping for {member.name}")
             return
 
         # CRITICAL: Prevent welcome messages to existing members on reconnection
@@ -4166,11 +4184,11 @@ class JakeyBot(commands.Bot):
             import datetime
             time_since_join = (datetime.datetime.now(datetime.timezone.utc) - member.joined_at).total_seconds()
             if time_since_join > 60:
-                logger.debug(
+                logger.info(
                     f"Skipping welcome for {member.name} - joined {time_since_join:.0f}s ago (not a new join)"
                 )
                 return
-            logger.debug(f"Member {member.name} joined {time_since_join:.1f}s ago - sending welcome")
+            logger.info(f"Member {member.name} joined {time_since_join:.1f}s ago - proceeding with welcome")
 
         # Find a suitable channel to send the welcome message
         welcome_channel = None

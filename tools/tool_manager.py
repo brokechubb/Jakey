@@ -43,6 +43,7 @@ class ToolManager:
         # DM context tracking - set before tool calls in DM messages
         self._in_dm_context = False
         self._dm_channel_id = None
+        self._current_guild_id = None
 
         # Initialize tools dictionary
         self.tools = {
@@ -3078,6 +3079,25 @@ class ToolManager:
             and "user_id" not in mapped_arguments
         ):
             mapped_arguments["user_id"] = user_id
+
+        # Auto-inject guild_id for moderation tools when missing but context is available
+        guild_required_tools = [
+            "discord_timeout_user",
+            "discord_remove_timeout",
+            "discord_kick_user",
+            "discord_ban_user",
+            "discord_unban_user",
+        ]
+        if tool_name in guild_required_tools and "guild_id" not in mapped_arguments:
+            if self._current_guild_id:
+                mapped_arguments["guild_id"] = self._current_guild_id
+
+        # Normalize duration_seconds -> duration_minutes for discord_timeout_user
+        if tool_name == "discord_timeout_user":
+            if "duration_seconds" in mapped_arguments and "duration_minutes" not in mapped_arguments:
+                mapped_arguments["duration_minutes"] = max(1, mapped_arguments.pop("duration_seconds") // 60)
+            elif "duration_seconds" in mapped_arguments:
+                mapped_arguments.pop("duration_seconds")
 
         try:
             tool_func = self.tools[tool_name]
