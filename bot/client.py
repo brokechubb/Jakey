@@ -103,6 +103,8 @@ THINKING_BLOCK_PATTERNS = [
 ]
 
 RAW_FUNCTION_PATTERN = re.compile(r"\b[a-z_]+\s*\{[^}]*\}", re.IGNORECASE)
+# Capturing version: name{"key": "val"} — used for extraction before sanitization strips it
+INLINE_JSON_CALL_PATTERN = re.compile(r'\b([a-z][a-z0-9_]*)\s*(\{[^}]*\})', re.IGNORECASE)
 DISCORD_FUNCTION_PATTERN = re.compile(
     r"\bdiscord_\w+\s*\{.*?\}", re.DOTALL | re.IGNORECASE
 )
@@ -612,6 +614,41 @@ def extract_text_tool_calls(ai_response: str) -> Tuple[List[Dict], str]:
                 continue
 
         cleaned_response = DSML_FUNCTION_CALLS_PATTERN.sub("", cleaned_response).strip()
+
+        if all_tool_calls:
+            return all_tool_calls, cleaned_response
+
+    # Try inline JSON call format: tool_name{"key": "value"} (name directly followed by JSON)
+    inline_json_matches = list(INLINE_JSON_CALL_PATTERN.finditer(ai_response))
+    if inline_json_matches:
+        for match in inline_json_matches:
+            try:
+                function_name = match.group(1)
+                parameters_str = match.group(2)
+
+                if function_name not in valid_tool_names:
+                    continue
+
+                parameters = json.loads(parameters_str)
+                tool_call = {
+                    "id": f"manual_{int(time.time())}_{len(all_tool_calls)}",
+                    "type": "function",
+                    "function": {"name": function_name, "arguments": parameters},
+                }
+                all_tool_calls.append(tool_call)
+                logging.getLogger(__name__).info(
+                    f"Extracted inline-JSON tool call: {function_name}({parameters})"
+                )
+            except (json.JSONDecodeError, Exception) as e:
+                logging.getLogger(__name__).debug(f"Failed to parse inline-JSON tool call: {e}")
+                continue
+
+        cleaned_response = INLINE_JSON_CALL_PATTERN.sub(
+            lambda m: "" if m.group(1) in valid_tool_names else m.group(0),
+            ai_response,
+        )
+        # Also strip any leftover [TOOL_CALLS] prefixes that wrapped the inline calls
+        cleaned_response = re.sub(r'\[TOOL_CALLS?\]', '', cleaned_response, flags=re.IGNORECASE).strip()
 
         if all_tool_calls:
             return all_tool_calls, cleaned_response
@@ -1139,9 +1176,13 @@ class JakeyBot(commands.Bot):
         "fattips_get_wallet", "fattips_list_airdrops",
         # Images - commonly used
         "generate_image", "analyze_image",
+        # Audio - Jakey uses TTS frequently
+        "generate_audio",
         # Discord basics
         "discord_get_user_info", "discord_send_message", "discord_send_dm",
         "discord_read_channel", "discord_search_messages",
+        # Discord moderation - always available so AI has correct schema
+        "discord_timeout_user", "discord_remove_timeout",
         }
 
         # Keyword → tool names to add
@@ -2324,8 +2365,6 @@ class JakeyBot(commands.Bot):
                 presence_penalty=0.2,  # Slightly reduce repetition of present tokens
                 # Enable model fallback routing for reliability
                 use_fallback_routing=True,
-                # Track user for rate limiting
-                user=str(message.author.id),
                 # Exclude problematic providers
                 provider={
                     "ignore": ["OpenInference"]  # Exclude provider causing 502 errors
@@ -2368,6 +2407,7 @@ class JakeyBot(commands.Bot):
 
             # Parse OpenAI-format response from providers
             generated_image_urls = []  # Track image URLs to ensure they're in the response
+            generated_audio_files = []  # Track (path, text) for audio files to send
             discord_sent_via_tool = []  # Track (channel_id, content) sent by discord_send_message tool
             if "choices" in response and len(response["choices"]) > 0:
                 ai_message = response["choices"][0]["message"]
@@ -2615,6 +2655,18 @@ class JakeyBot(commands.Bot):
                                     f"📸 Tracked generated image URL for response"
                                 )
 
+                            # Track generated audio files to send as Discord files
+                            if (
+                                function_name == "generate_audio"
+                                and isinstance(result, str)
+                                and result.startswith("AUDIO_FILE:")
+                            ):
+                                audio_path = result.replace("AUDIO_FILE:", "")
+                                audio_text = arguments.get("text", "")
+                                generated_audio_files.append((audio_path, audio_text))
+                                result = "✅ Audio generated successfully — sending as file."
+                                logger.info(f"🔊 Tracked generated audio file for sending")
+
                             # Track messages sent via discord_send_message to detect duplicates
                             if function_name == "discord_send_message" and isinstance(result, dict) and "message" in result:
                                 sent_channel = str(arguments.get("channel_id", ""))
@@ -2654,7 +2706,7 @@ class JakeyBot(commands.Bot):
                     # Update conversation history
                     if tool_messages:
                         # Sanitize tool_calls before adding to history
-                        # Fix None arguments which cause API validation errors
+                        # Fix None arguments and invalid function names
                         sanitized_tool_calls = []
                         for tc in tool_calls:
                             sanitized_tc = tc.copy()
@@ -2664,6 +2716,14 @@ class JakeyBot(commands.Bot):
                                     if isinstance(sanitized_tc["function"], dict)
                                     else {}
                                 )
+                                # Sanitize function name: strip invalid chars, keep only [a-zA-Z0-9_-]
+                                raw_name = func.get("name", "")
+                                clean_name = re.sub(r"[^a-zA-Z0-9_\-]", "", raw_name.split()[0] if raw_name.split() else "")
+                                if clean_name != raw_name:
+                                    logger.warning(
+                                        f"Sanitized tool call name: '{raw_name}' -> '{clean_name}'"
+                                    )
+                                    func["name"] = clean_name
                                 # Ensure arguments is a valid JSON string, not None
                                 args = func.get("arguments")
                                 if args is None:
@@ -2745,7 +2805,6 @@ class JakeyBot(commands.Bot):
                                 tools=available_tools if not is_final_round else None,
                                 tool_choice=current_tool_choice,
                                 use_fallback_routing=True,
-                                user=str(message.author.id),
                             )
 
                             if final_response.get("error"):
@@ -2811,28 +2870,40 @@ class JakeyBot(commands.Bot):
                             tool_calls = ai_message.get("tool_calls", [])
 
                             # Check for text-based tool calls again (defensive)
-                            # Skip entirely if we forced tool_choice='none' — respect the constraint
-                            # even when the model embeds DSML/paren-kw syntax in its text response.
-                            if not tool_calls and ai_response and current_tool_choice != "none":
+                            # When tool_choice='none', still extract but strip send-loop tools.
+                            # generate_audio uploads a file (not a chat message) so it's safe to allow.
+                            SEND_LOOP_TOOLS = {"discord_send_message", "discord_send_dm"}
+                            if not tool_calls and ai_response:
                                 extracted_calls, cleaned_response = (
                                     extract_text_tool_calls(ai_response)
                                 )
                                 if extracted_calls:
-                                    tool_calls = extracted_calls
-                                    ai_response = cleaned_response
-                                    logger.info(
-                                        f"✅ Converted text-based tool call in loop"
-                                    )
+                                    if current_tool_choice == "none":
+                                        # Filter out tools that could cause send loops
+                                        safe_calls = [c for c in extracted_calls if c["function"]["name"] not in SEND_LOOP_TOOLS]
+                                        if safe_calls:
+                                            tool_calls = safe_calls
+                                            ai_response = cleaned_response
+                                            logger.info(f"✅ Converted {len(safe_calls)} safe text-based tool call(s) despite tool_choice='none'")
+                                        # else: all extracted calls were send-loop tools, skip them
+                                    else:
+                                        tool_calls = extracted_calls
+                                        ai_response = cleaned_response
+                                        logger.info(f"✅ Converted text-based tool call in loop")
 
                             # SAFETY: If we forced tool_choice='none' (final round OR after discord_send_message)
                             # but model still returned API-level tool calls, ignore them to break the loop.
                             if (is_final_round or current_tool_choice == "none") and tool_calls:
-                                logger.warning(
-                                    f"⚠️ Model ignored tool_choice='none' (final_round={is_final_round}). Ignoring {len(tool_calls)} tool calls to prevent loop."
-                                )
-                                tool_calls = []
-                                # If content is empty, provide a fallback message
-                                if not ai_response:
+                                # Allow safe non-send tools through even in 'none' mode
+                                send_loop_calls = [c for c in tool_calls if c["function"]["name"] in SEND_LOOP_TOOLS]
+                                safe_calls = [c for c in tool_calls if c["function"]["name"] not in SEND_LOOP_TOOLS]
+                                if send_loop_calls:
+                                    logger.warning(
+                                        f"⚠️ Model ignored tool_choice='none' (final_round={is_final_round}). Blocking {len(send_loop_calls)} send tool call(s)."
+                                    )
+                                tool_calls = [] if is_final_round else safe_calls
+                                # If content is empty and no safe calls remain, provide a fallback message
+                                if not ai_response and not tool_calls:
                                     ai_response = "*(I stopped because I was getting stuck in a loop)*"
                         else:
                             # No valid choices or error response structure
@@ -2910,7 +2981,6 @@ class JakeyBot(commands.Bot):
                         tools=None,
                         tool_choice="none",
                         use_fallback_routing=True,
-                        user=str(message.author.id),
                     )
 
                     if (
@@ -3051,6 +3121,25 @@ class JakeyBot(commands.Bot):
                     if url not in ai_response and url not in tool_sent_text:
                         ai_response = ai_response.rstrip() + "\n\n" + url
                         logger.info(f"📸 Appended missing image URL to response")
+
+            # Send any generated audio files
+            if generated_audio_files:
+                import io as _io
+                import os as _os
+                for audio_path, audio_text in generated_audio_files:
+                    try:
+                        with open(audio_path, "rb") as f:
+                            audio_bytes = f.read()
+                        label = f"**🔊** {audio_text}" if audio_text else "**🔊**"
+                        await message.channel.send(label, file=discord.File(_io.BytesIO(audio_bytes), filename="jakey_says.mp3"))
+                        logger.info(f"🔊 Sent audio file from tool call")
+                    except Exception as ae:
+                        logger.error(f"Failed to send audio file: {ae}")
+                    finally:
+                        try:
+                            _os.unlink(audio_path)
+                        except Exception:
+                            pass
 
             if not ai_response:
                 if tool_sent_suppressed:

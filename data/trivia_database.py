@@ -478,7 +478,7 @@ class TriviaDatabase:
                     JOIN trivia_categories c ON q.category_id = c.id
                     WHERE c.name = ? AND q.is_active = 1
                     AND q.id NOT IN ({placeholders})
-                    ORDER BY q.times_asked ASC, RANDOM()
+                    ORDER BY q.times_asked ASC, q.last_used ASC NULLS FIRST, RANDOM()
                     LIMIT ?
                 """
                 cursor.execute(query, (category_name, *exclude_ids, limit))
@@ -490,7 +490,7 @@ class TriviaDatabase:
                     FROM trivia_questions q
                     JOIN trivia_categories c ON q.category_id = c.id
                     WHERE c.name = ? AND q.is_active = 1
-                    ORDER BY q.times_asked ASC, RANDOM()
+                    ORDER BY q.times_asked ASC, q.last_used ASC NULLS FIRST, RANDOM()
                     LIMIT ?
                 """,
                     (category_name, limit),
@@ -514,6 +514,25 @@ class TriviaDatabase:
         return await asyncio.get_running_loop().run_in_executor(
             self._executor, _get_questions
         )
+
+    async def mark_question_used(self, question_id: int):
+        """Increment times_asked and set last_used for a question selected in a trivia game"""
+
+        def _mark_used():
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                UPDATE trivia_questions
+                SET times_asked = times_asked + 1, last_used = CURRENT_TIMESTAMP
+                WHERE id = ?
+            """,
+                (question_id,),
+            )
+            conn.commit()
+            conn.close()
+
+        await asyncio.get_running_loop().run_in_executor(self._executor, _mark_used)
 
     # Statistics
     async def record_trivia_attempt(

@@ -62,6 +62,7 @@ class ToolManager:
             "crawling": self.crawling,
             "generate_image": self.generate_image,
             "analyze_image": self.analyze_image,
+            "generate_audio": self.generate_audio,
             "calculate": self.calculate,
             "get_current_time": self.get_current_time,
             "remember_user_mcp": self.remember_user_info,
@@ -214,7 +215,7 @@ class ToolManager:
         # Maps channel_id -> deque of recent question IDs (last 50 per channel)
         from collections import deque
         self._trivia_recent: dict = {}
-        self._trivia_recent_max = 50  # How many recent questions to track per channel
+        self._trivia_recent_max = 200  # How many recent questions to track per channel
 
     def _check_dm_restriction(self, tool_name: str) -> Optional[str]:
         """Check if tool is restricted in DM context"""
@@ -645,6 +646,28 @@ class ToolManager:
                             },
                         },
                         "required": ["image_url"],
+                    },
+                },
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "generate_audio",
+                    "description": "Generate spoken audio from text using text-to-speech and send it as an audio file in the Discord channel. Use this when someone asks you to say something out loud, generate speech, create audio, or wants to hear something spoken.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "text": {
+                                "type": "string",
+                                "description": "The text to convert to speech",
+                            },
+                            "voice": {
+                                "type": "string",
+                                "description": "Voice to use. Options: en-US-AndrewNeural (male, default), en-US-GuyNeural (male), en-US-EricNeural (male), en-US-BrianNeural (male), en-US-AriaNeural (female), en-GB-RyanNeural (British male)",
+                                "default": "en-US-AndrewNeural",
+                            },
+                        },
+                        "required": ["text"],
                     },
                 },
             },
@@ -2009,6 +2032,21 @@ class ToolManager:
         except Exception as e:
             return f"Unexpected error during URL crawling: {str(e)}"
 
+    async def generate_audio(self, text: str, voice: str = "en-US-AndrewNeural") -> str:
+        """Generate audio from text using edge-tts and return temp file path"""
+        try:
+            import edge_tts
+            import tempfile
+            import os
+
+            communicate = edge_tts.Communicate(text, voice)
+            tmp = tempfile.NamedTemporaryFile(suffix=".mp3", delete=False)
+            tmp.close()
+            await communicate.save(tmp.name)
+            return f"AUDIO_FILE:{tmp.name}"
+        except Exception as e:
+            return f"Error generating audio: {str(e)}"
+
     def generate_image(
         self, prompt: str, style: str = "SDXL 1.0", ratio: str = "1:1"
     ) -> str:
@@ -3084,6 +3122,7 @@ class ToolManager:
 
             # Tools that are async and need to be awaited directly
             async_tools = [
+                "generate_audio",
                 # FatTips tools - all are async and make API calls
                 "fattips_get_balance",
                 "fattips_send_tip",
@@ -3243,7 +3282,7 @@ class ToolManager:
                 self._trivia_games = {}  # channel_id -> game_state
             if not hasattr(self, "_trivia_recent"):
                 self._trivia_recent = {}
-                self._trivia_recent_max = 50
+                self._trivia_recent_max = 200
 
             # Check if there's already an active game in this channel
             if channel_id in self._trivia_games:
@@ -3258,14 +3297,14 @@ class ToolManager:
             # Get available categories if category not specified
             if category:
                 questions = await trivia_db.get_questions_by_category(
-                    category, limit=50, exclude_ids=recent_ids
+                    category, limit=200, exclude_ids=recent_ids
                 )
                 if not questions:
                     # All recent questions exhausted for this category, reset and retry
                     if recent_ids:
                         self._trivia_recent.pop(channel_id, None)
                         questions = await trivia_db.get_questions_by_category(
-                            category, limit=50
+                            category, limit=200
                         )
                 if not questions:
                     return f"❌ No trivia questions found for category: `{category}`. Try %triviacats to see available categories."
@@ -3285,14 +3324,14 @@ class ToolManager:
                 selected_category = random.choice(categories_with_questions)
                 category = selected_category["name"]
                 questions = await trivia_db.get_questions_by_category(
-                    category, limit=50, exclude_ids=recent_ids
+                    category, limit=200, exclude_ids=recent_ids
                 )
                 if not questions:
                     # Exhausted recent questions for this category, reset and retry
                     if recent_ids:
                         self._trivia_recent.pop(channel_id, None)
                         questions = await trivia_db.get_questions_by_category(
-                            category, limit=50
+                            category, limit=200
                         )
 
             # Filter by difficulty if specified
@@ -3310,6 +3349,9 @@ class ToolManager:
             if channel_id not in self._trivia_recent:
                 self._trivia_recent[channel_id] = deque(maxlen=self._trivia_recent_max)
             self._trivia_recent[channel_id].append(question["id"])
+
+            # Persist usage so this question is deprioritized across restarts
+            await trivia_db.mark_question_used(question["id"])
 
             # Store the active game
             start_time = asyncio.get_event_loop().time()

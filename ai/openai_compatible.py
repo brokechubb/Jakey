@@ -242,8 +242,8 @@ class OpenAICompatibleAPI:
             payload["stop"] = stop
         if response_format is not None:
             payload["response_format"] = response_format
-        if user is not None:
-            payload["user"] = user
+        # NOTE: Local LLM servers often reject the 'user' field,
+        # and we don't need OpenAI-style per-user tracking anyway
 
         # Add tools if provided
         if tools:

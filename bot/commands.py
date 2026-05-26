@@ -2619,19 +2619,18 @@ def setup_commands(bot):
             pass
 
         try:
-            # Generate audio URL using OpenRouter text-to-speech
-            import urllib.parse
+            import io
+            import edge_tts
 
-            encoded_text = urllib.parse.quote(text)
-            audio_url = f"https://api.openai.com/v1/audio/speech?model=tts-1&voice=nova&input={encoded_text}"
+            communicate = edge_tts.Communicate(text, "en-US-AndrewNeural")
+            audio_buffer = io.BytesIO()
+            async for chunk in communicate.stream():
+                if chunk["type"] == "audio":
+                    audio_buffer.write(chunk["data"])
+            audio_buffer.seek(0)
 
-            # Send the result
-            response = (
-                f"**🔊 Audio Generated!**\n**Text:** {text}\n**Audio URL:** {audio_url}"
-            )
-
-            # Send long message without truncation
-            await send_long_message(ctx.channel, response)
+            audio_file = discord.File(audio_buffer, filename="audio.mp3")
+            await ctx.send(f"**🔊** {text}", file=audio_file)
 
         except Exception as e:
             error_msg = f"💀 Audio generation failed: {str(e)}"

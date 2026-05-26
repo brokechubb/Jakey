@@ -6,3 +6,4 @@ aiohttp
 pytz
 yfinance
 aiosqlite
+edge-tts
