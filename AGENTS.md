@@ -481,7 +481,7 @@ if not model_supports_tools:
     available_tools = None  # Disable all 42 tools
 ```
 
-**Blacklist** (no tools): `qwen3-coder-flash`, `deepseek-v3`, `glm4.5-air`, `cogito-2.1`  
+**Blacklist** (no tools): `qwen3-coder-flash`, `deepseek-v3`, `glm4.5-air`  
 **Whitelist** (full tools): `qwen3-coder-plus`, `qwen3-max`, `gemini-2.5-flash`
 
 ### Model Commands
