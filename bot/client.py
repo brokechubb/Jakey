@@ -1698,6 +1698,15 @@ class JakeyBot(commands.Bot):
             logger.debug("Ignoring message from self to prevent loops")
             return
 
+        # Detect new member joins via system messages (on_member_join doesn't fire for self-bots)
+        if message.type == discord.MessageType.new_member and message.guild and isinstance(message.author, discord.Member):
+            from config import WELCOME_CHANNEL_IDS, WELCOME_ENABLED, WELCOME_PROMPT, WELCOME_SERVER_IDS
+            if WELCOME_ENABLED and str(message.guild.id) in WELCOME_SERVER_IDS:
+                member = message.author
+                logger.info(f"🎉 Detected new member via system message: {member.name} in {message.guild.name}")
+                await self._send_welcome_for_member(member, WELCOME_PROMPT)
+            return
+
         # Handle tip.cc bot messages (special case - need to parse even from bots)
         if (
             message.author.bot and message.author.id == 617037497574359050
@@ -4284,68 +4293,46 @@ class JakeyBot(commands.Bot):
         return None
 
     async def on_member_join(self, member):
-        """Handle new member joining a server - send welcome message if enabled."""
-        # Import config values at runtime to allow patching in tests
-        from config import (
-            WELCOME_CHANNEL_IDS,
-            WELCOME_ENABLED,
-            WELCOME_PROMPT,
-            WELCOME_SERVER_IDS,
-        )
+        """Handle new member joining a server - delegates to shared welcome logic."""
+        from config import WELCOME_ENABLED, WELCOME_SERVER_IDS
 
-        # Check if welcome feature is enabled
         if not WELCOME_ENABLED:
             return
-
-        # Check if this server is configured for welcome messages
         if str(member.guild.id) not in WELCOME_SERVER_IDS:
             return
 
-        # CRITICAL: Prevent welcome messages to existing members on reconnection
-        # Discord sends on_member_join events for existing members when:
-        # - Bot reconnects after disconnect
-        # - Member chunking happens
-        # - Cache is invalidated
-        # Only send welcome if member joined within the last 60 seconds
+        # Only send welcome if member joined within the last 60 seconds (reconnection guard)
         if member.joined_at:
             import datetime
             time_since_join = (datetime.datetime.now(datetime.timezone.utc) - member.joined_at).total_seconds()
             if time_since_join > 60:
-                logger.debug(
-                    f"Skipping welcome for {member.name} - joined {time_since_join:.0f}s ago (not a new join)"
-                )
+                logger.debug(f"Skipping welcome for {member.name} - joined {time_since_join:.0f}s ago")
                 return
-            logger.debug(f"Member {member.name} joined {time_since_join:.1f}s ago - sending welcome")
+
+        from config import WELCOME_PROMPT
+        await self._send_welcome_for_member(member, WELCOME_PROMPT)
+
+    async def _send_welcome_for_member(self, member, custom_prompt):
+        """Find welcome channel, generate AI message, and send it."""
+        from config import WELCOME_CHANNEL_IDS
 
         # Find a suitable channel to send the welcome message
         welcome_channel = None
 
-        # First try to use configured welcome channel IDs
         if WELCOME_CHANNEL_IDS:
-            # Filter out empty strings and None values
-            valid_channel_ids = [
-                cid for cid in WELCOME_CHANNEL_IDS if cid and cid.strip()
-            ]
+            valid_channel_ids = [cid for cid in WELCOME_CHANNEL_IDS if cid and cid.strip()]
             if valid_channel_ids:
                 for channel_id in valid_channel_ids:
                     try:
                         channel = member.guild.get_channel(int(channel_id.strip()))
-                        if channel and isinstance(channel, discord.TextChannel):
-                            # Verify the channel is in the same guild
-                            if channel.guild.id == member.guild.id:
-                                welcome_channel = channel
-                                logger.debug(
-                                    f"Found configured welcome channel: {channel.name} (ID: {channel.id})"
-                                )
-                                break
+                        if channel and isinstance(channel, discord.TextChannel) and channel.guild.id == member.guild.id:
+                            welcome_channel = channel
+                            logger.debug(f"Found configured welcome channel: {channel.name} (ID: {channel.id})")
+                            break
                     except (ValueError, TypeError):
-                        # Invalid channel ID, skip
-                        logger.warning(
-                            f"Invalid channel ID in WELCOME_CHANNEL_IDS: {channel_id}"
-                        )
+                        logger.warning(f"Invalid channel ID in WELCOME_CHANNEL_IDS: {channel_id}")
                         continue
 
-        # If no configured channel found, try to find a channel named 'welcome' or 'general'
         if not welcome_channel:
             for channel in member.guild.text_channels:
                 if channel.name.lower() in ["welcome", "general"]:
@@ -4353,54 +4340,30 @@ class JakeyBot(commands.Bot):
                     logger.debug(f"Found fallback channel by name: {channel.name}")
                     break
 
-        # If no specific channel found, use the first available text channel
         if not welcome_channel:
-            welcome_channel = (
-                member.guild.text_channels[0] if member.guild.text_channels else None
-            )
+            welcome_channel = member.guild.text_channels[0] if member.guild.text_channels else None
 
-        # If no channel available, log and return
         if not welcome_channel:
-            logger.warning(
-                f"No suitable welcome channel found for guild {member.guild.name} (ID: {member.guild.id})"
-            )
+            logger.warning(f"No suitable welcome channel found for guild {member.guild.name} (ID: {member.guild.id})")
             return
 
-        # Check if bot has permission to send messages
         bot_member = member.guild.me
         if not welcome_channel.permissions_for(bot_member).send_messages:
-            logger.warning(
-                f"Bot lacks permission to send messages in {welcome_channel.name} ({welcome_channel.id}) in guild {member.guild.name}"
-            )
+            logger.warning(f"Bot lacks permission to send messages in {welcome_channel.name} ({welcome_channel.id})")
             return
 
-        # Generate and send welcome message
         try:
-            welcome_message = await self.generate_welcome_message(
-                member, WELCOME_PROMPT
-            )
+            welcome_message = await self.generate_welcome_message(member, custom_prompt)
             if welcome_message:
-                # Prepend member mention to the welcome message
                 full_welcome_message = f"{member.mention} {welcome_message}"
-
-                # Add rate limiting safety
-                await asyncio.sleep(1)  # Brief delay to avoid rate limits
-
+                await asyncio.sleep(1)
                 await welcome_channel.send(full_welcome_message)
-                logger.info(
-                    f"Sent welcome message to {member.name} in {welcome_channel.name}"
-                )
+                logger.info(f"Sent welcome message to {member.name} in {welcome_channel.name}")
             else:
-                # If AI didn't generate a message, use fallback
-                logger.warning(
-                    f"⚠️ AI returned None or empty for welcome message for {member.name} - using STATIC fallback"
-                )
+                logger.warning(f"⚠️ AI returned None or empty for welcome message for {member.name} - using STATIC fallback")
                 fallback_message = f"Welcome {member.mention} to {member.guild.name}! 🎰💀 Ready to lose some money? Don't forget to pick your roles and join the degenerate casino! EZ money awaits! 🎲💰"
                 await welcome_channel.send(fallback_message)
-                logger.warning(
-                    f"❌ Sent STATIC fallback welcome message to {member.name}"
-                )
-
+                logger.warning(f"❌ Sent STATIC fallback welcome message to {member.name}")
         except discord.errors.RateLimited as e:
             logger.warning(f"Rate limited when sending welcome message: {e}")
         except discord.errors.Forbidden as e:
@@ -4411,20 +4374,13 @@ class JakeyBot(commands.Bot):
             logger.error(f"Unexpected error sending welcome message: {e}")
             logger.error(f"   Error type: {type(e).__name__}")
             logger.error(f"   Traceback: {traceback.format_exc()}")
-            # Send fallback if possible
             try:
-                logger.warning(
-                    f"⚠️ Attempting to send STATIC fallback message after exception for {member.name}"
-                )
+                logger.warning(f"⚠️ Attempting to send STATIC fallback message after exception for {member.name}")
                 fallback_message = f"Welcome {member.mention} to {member.guild.name}! 🎰💀 Ready to lose some money! Don't forget to pick your roles and join the degenerate casino! EZ money awaits! 🎲💰"
                 await welcome_channel.send(fallback_message)
-                logger.warning(
-                    f"❌ Sent STATIC fallback welcome message after error for {member.name}"
-                )
+                logger.warning(f"❌ Sent STATIC fallback welcome message after error for {member.name}")
             except:
-                logger.error(
-                    f"💥 Failed to send fallback welcome message for {member.name}"
-                )
+                logger.error(f"💥 Failed to send fallback welcome message for {member.name}")
 
     async def on_guild_join(self, guild):
         """Handle joining a new guild"""
