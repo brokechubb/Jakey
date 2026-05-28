@@ -1693,18 +1693,19 @@ class JakeyBot(commands.Bot):
             f"Received message from {message.author.name}#{message.author.discriminator} in {message.guild.name if message.guild else 'DM'}"
         )
 
+        # Detect new member joins via system messages (on_member_join doesn't fire for self-bots)
+        # Check BEFORE the self.user filter — system message authors may be User not Member
+        if message.type == discord.MessageType.new_member and message.guild:
+            from config import WELCOME_CHANNEL_IDS, WELCOME_ENABLED, WELCOME_PROMPT, WELCOME_SERVER_IDS
+            if WELCOME_ENABLED and str(message.guild.id) in WELCOME_SERVER_IDS:
+                member = message.guild.get_member(message.author.id) or message.author
+                logger.info(f"🎉 Detected new member via system message: {member.name} in {message.guild.name}")
+                await self._send_welcome_for_member(member, WELCOME_PROMPT)
+            return
+
         # Don't respond to ourselves (essential for self-bots to prevent loops)
         if message.author == self.user:
             logger.debug("Ignoring message from self to prevent loops")
-            return
-
-        # Detect new member joins via system messages (on_member_join doesn't fire for self-bots)
-        if message.type == discord.MessageType.new_member and message.guild and isinstance(message.author, discord.Member):
-            from config import WELCOME_CHANNEL_IDS, WELCOME_ENABLED, WELCOME_PROMPT, WELCOME_SERVER_IDS
-            if WELCOME_ENABLED and str(message.guild.id) in WELCOME_SERVER_IDS:
-                member = message.author
-                logger.info(f"🎉 Detected new member via system message: {member.name} in {message.guild.name}")
-                await self._send_welcome_for_member(member, WELCOME_PROMPT)
             return
 
         # Handle tip.cc bot messages (special case - need to parse even from bots)

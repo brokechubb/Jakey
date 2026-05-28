@@ -1128,7 +1128,7 @@ class ToolManager:
                 "type": "function",
                 "function": {
                     "name": "generate_keno_numbers",
-                    "description": "Generate random Keno numbers (1-10 numbers from 1-40) with 8x5 visual board",
+                    "description": "Generate random Keno numbers (1-10 numbers from 1-40) with 8x5 visual board. Use this DIRECTLY whenever someone asks for Keno numbers, Keno picks, lucky Keno numbers, or any Keno-related request — do NOT search messages for 'Keno' first, just call this tool immediately.",
                     "parameters": {
                         "type": "object",
                         "properties": {
