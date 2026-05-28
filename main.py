@@ -60,11 +60,11 @@ def release_lock():
     """Release the lock file"""
     global lock_file
     if lock_file:
+        lock_file.close()
         try:
             os.unlink(LOCK_FILE_PATH)
         except:
             pass
-        lock_file.close()
 
 
 def signal_handler(signum, frame):
@@ -73,20 +73,11 @@ def signal_handler(signum, frame):
     try:
         logger.info("🛑 Received shutdown signal...")
     except Exception:
-        # Logger might be shutting down, ignore errors
         pass
 
     running = False
-    # Release the lock file
     release_lock()
-    # The bot will be stopped gracefully in the main loop
     sys.exit(0)
-
-
-def setup_signal_handlers():
-    """Set up signal handlers for graceful shutdown"""
-    signal.signal(signal.SIGINT, signal_handler)
-    signal.signal(signal.SIGTERM, signal_handler)
 
 
 def main():
@@ -97,14 +88,6 @@ def main():
     if not acquire_lock():
         logger.warning("⚠️  Another instance of Jakey is already running!")
         sys.exit(1)
-
-    # Set up signal handler to release lock on exit
-    def signal_handler_with_lock(signum, frame):
-        release_lock()
-        signal_handler(signum, frame)
-
-    signal.signal(signal.SIGINT, signal_handler_with_lock)
-    signal.signal(signal.SIGTERM, signal_handler_with_lock)
 
     # Check if DISCORD_TOKEN is available
     if not DISCORD_TOKEN:

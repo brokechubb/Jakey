@@ -1862,6 +1862,7 @@ class JakeyBot(commands.Bot):
                             return  # Don't process as regular message
                         # If not correct and game not ended, silently continue
                         # (let users keep guessing without feedback on wrong answers)
+                        return
                     except Exception as e:
                         logger.error(f"Error checking trivia answer: {e}")
 
