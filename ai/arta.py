@@ -19,57 +19,55 @@ class ArtaAPI:
 
         self.api_key = ARTA_API_KEY
 
-        # Available styles from the arta.go file
+        # Available styles — fetched dynamically from the API (May 2026)
         self.styles = [
-            "Medieval",
-            "Vincent Van Gogh",
-            "F Dev",
-            "Low Poly",
-            "Dreamshaper-xl",
-            "Anima-pencil-xl",
-            "Biomech",
-            "Trash Polka",
-            "No Style",
-            "Cheyenne-xl",
-            "Chicano",
-            "Embroidery tattoo",
-            "Red and Black",
-            "Fantasy Art",
-            "Watercolor",
-            "Dotwork",
-            "Old school colored",
-            "Realistic tattoo",
+            "3D Logo", "3D Logo 2", "3d Render Style",
+            "Abstract Logo", "Abstract Logo 2",
+            "Anime tattoo", "Arcane Style",
+            "Biomech", "Black Ink",
+            "Chicano", "Christmas Doll Nano Style",
+            "Christmas Postcard Nano Style", "Christmas Poster Nano Style",
+            "Cinematic Filmstill Style", "Clay Style", "Coloring Book Style",
+            "Combination Logo", "Combination Logo 2",
+            "Crochet Amigurumi Style", "Cute Cartoon Style",
+            "Death metal", "Devil Maycry Style", "Doll Nano Style", "Dotwork",
+            "Elegant Logo", "Elegant Logo 2",
+            "Emblem Logo", "Emblem Logo 2", "Embroidery tattoo", "Emoji Style",
+            "Epic Logo", "Epic Logo 2",
+            "F Dev", "F Pro",
+            "F2 Analog Style", "F2 Klein 4B", "F2 Klein 9B",
+            "F2 Logos Style", "F2 Pro", "F2 Turbo",
+            "Film Grain Style", "Flame design", "Flux",
+            "Futuristic Logo", "Futuristic Logo 2",
+            "GPT4o", "GPT4o Ghibli",
+            "Geometric Logo", "Geometric Logo 2",
+            "Ghost Mannequin Style", "Gradient Logo", "Gradient Logo 2",
+            "Graffiti", "Grunge Logo", "Grunge Logo 2",
+            "Hand-drawn Logo", "Hand-drawn Logo 2", "High GPT4o", "Hunyuan Style",
+            "Icons Style", "Isometric Flux Style",
             "Japanese_2",
-            "Realistic-stock-xl",
-            "F Pro",
-            "RevAnimated",
-            "Katayama-mix-xl",
-            "SDXL L",
-            "Cor-epica-xl",
-            "Anime tattoo",
-            "New School",
-            "Death metal",
-            "Old School",
-            "Juggernaut-xl",
-            "Photographic",
-            "SDXL 1.0",
-            "Graffiti",
-            "Mini tattoo",
-            "Surrealism",
-            "Neo-traditional",
-            "On limbs black",
-            "Yamers-realistic-xl",
-            "Pony-xl",
-            "Playground-xl",
-            "Anything-xl",
-            "Flame design",
             "Kawaii",
-            "Cinematic Art",
-            "Professional",
-            "Flux",
-            "Black Ink",
-            "Epicrealism-xl",
-            "High GPT4o",
+            "Low Poly",
+            "Mascots Logo", "Mascots Logo 2", "Medieval",
+            "Memes Style", "Mikkoph Style", "Mini tattoo",
+            "Minimalistic Logo", "Minimalistic Logo 2",
+            "Monogram Logo", "Monogram Logo 2",
+            "Nano Banana 2 Style", "Nano Banana Pro Style", "Nano Banana Style",
+            "Neo-traditional", "New School",
+            "Old School", "Old school colored",
+            "On limbs black", "On limbs color",
+            "Phone Case Style", "Polaroid Style",
+            "Postcard Nano Style", "Poster Nano Style", "Professional",
+            "Random Text", "Realistic tattoo", "Red and Black", "RevAnimated",
+            "Seedream Test", "Snapchat Style", "Stickers Style",
+            "Studio Ghibli Style", "Surrealism",
+            "Trash Polka",
+            "Vincent Van Gogh",
+            "Watercolor",
+            "our_hunyuan_t2i", "our_hunyuan_t2i_1", "our_hunyuan_t2i_2", "our_hunyuan_t2i_3",
+            "qa_t2i_test_gpt_image_2_v3", "qa_t2i_test_gpt_image_2_v5",
+            "qa_t2i_test_gpt_image_2_v6", "qa_t2i_test_gpt_image_2_v7",
+            "test_qa_t2i_our_flux2_klein_4b_1", "test_qa_t2i_our_flux2_klein_9b_1",
         ]
 
         # Available ratios from the arta.go file
@@ -119,7 +117,7 @@ class ArtaAPI:
     def generate_image(
         self,
         prompt: str,
-        style: str = "SDXL 1.0",
+        style: str = "Flux",
         ratio: str = "1:1",
         negative_prompt: str = "",
         count: str = "1",
@@ -194,7 +192,13 @@ class ArtaAPI:
             return image_url
 
         except requests.exceptions.RequestException as e:
-            logger.error(f"Error generating image: {e}")
+            response_body = ""
+            if e.response is not None:
+                try:
+                    response_body = e.response.text[:500]
+                except Exception:
+                    pass
+            logger.error(f"Error generating image: {e} | Response: {response_body}")
             return None
         except Exception as e:
             logger.error(f"Unexpected error generating image: {e}")

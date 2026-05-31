@@ -604,7 +604,7 @@ class ToolManager:
                 "type": "function",
                 "function": {
                     "name": "generate_image",
-                    "description": "Generate an image using Arta API. Choose a style that matches the user's request.",
+                    "description": "Generate an image using Arta API (with Pollinations fallback). Choose a style that matches the user's request.",
                     "parameters": {
                         "type": "object",
                         "properties": {
@@ -614,8 +614,8 @@ class ToolManager:
                             },
                             "style": {
                                 "type": "string",
-                                "description": "Artistic style. Options: Fantasy Art, Cinematic Art, Surrealism, Vincent Van Gogh, Photographic, Professional, Epicrealism-xl, Anime tattoo, Kawaii, Graffiti, Death metal, Flame design, Black Ink, Flux, High GPT4o, Realistic tattoo, Old School, New School, Neo-traditional, Chicano, Dotwork, Embroidery tattoo, Japanese_2, Watercolor, Low Poly, Trash Polka, Medieval, Biomech, SDXL 1.0, SDXL L, No Style, Juggernaut-xl, Dreamshaper-xl, RevAnimated, Katayama-mix-xl, Cor-epica-xl, Playground-xl, Anything-xl, Pony-xl, Yamers-realistic-xl, Realistic-stock-xl, Cheyenne-xl, F Dev, F Pro, Mini tattoo, Old school colored, Red and Black, On limbs black. Default: SDXL 1.0",
-                                "default": "SDXL 1.0",
+                                "description": "Artistic style. Options: Surrealism, Flux, GPT4o, GPT4o Ghibli, Professional, Realistic tattoo, Black Ink, Watercolor, Anime tattoo, Biomech, Flame design, Neo-traditional, Old school colored, On limbs black, Old School, New School, Medieval, Kawaii, Graffiti, Death metal, Dotwork, Embroidery tattoo, Chicano, Trash Polka, Vincent Van Gogh, Low Poly, F Dev, F Pro, RevAnimated, Studio Ghibli Style, Arcane Style, Cinematic Filmstill Style, Memes Style, 3d Render Style, Cute Cartoon Style, Clay Style, Stickers Style, Snapchat Style, Isometric Flux Style, Coloring Book Style, Ghost Mannequin Style, Minimalistic Logo, Abstract Logo, Emblem Logo, Mascots Logo, Futuristic Logo, Geometric Logo, Combination Logo, Monogram Logo, F2 Klein 4B, F2 Logos Style, Random Text. Default: Flux",
+                                "default": "Flux",
                             },
                             "ratio": {
                                 "type": "string",
@@ -2048,9 +2048,9 @@ class ToolManager:
             return f"Error generating audio: {str(e)}"
 
     def generate_image(
-        self, prompt: str, style: str = "SDXL 1.0", ratio: str = "1:1"
+        self, prompt: str, style: str = "Flux", ratio: str = "1:1"
     ) -> str:
-        """Generate an image using Arta API with rate limiting"""
+        """Generate an image using Arta API with Pollinations fallback and rate limiting"""
         if not self._check_rate_limit("generate_image"):
             return "Rate limit exceeded. Please wait before generating another image."
 
