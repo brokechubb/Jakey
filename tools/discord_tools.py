@@ -43,7 +43,7 @@ class DiscordTools:
                 embed.add_field(name="Duration", value=duration, inline=True)
             embed.add_field(name="Reason", value=reason or "None provided", inline=False)
             embed.set_footer(text=f"Action by {self.bot.user}")
-            await channel.send(embed=embed)
+            await channel.send(embeds=[embed])
         except Exception as e:
             logger.error(f"Failed to send mod notification: {e}")
 

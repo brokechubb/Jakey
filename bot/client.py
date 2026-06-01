@@ -3242,7 +3242,7 @@ class JakeyBot(commands.Bot):
                     try:
                         embed = discord.Embed()
                         embed.set_image(url=img_url)
-                        await message.channel.send(embed=embed)
+                        await message.channel.send(embeds=[embed])
                         logger.info(f"📸 Sent image as embed: {img_url[:100]}...")
                     except Exception as e:
                         logger.error(f"Failed to send image embed, falling back to URL: {e}")
