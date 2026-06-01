@@ -2583,9 +2583,15 @@ def setup_commands(bot):
                 pass
 
             # Send the final result
-            await ctx.send(
-                f"🎨 **Image Generated Successfully!**\n**Prompt:** {final_prompt}\n{image_url}"
-            )
+            if "image.pollinations.ai" in image_url:
+                embed = discord.Embed(title="🎨 Image Generated Successfully!")
+                embed.add_field(name="Prompt", value=final_prompt[:1024], inline=False)
+                embed.set_image(url=image_url)
+                await ctx.send(embed=embed)
+            else:
+                await ctx.send(
+                    f"🎨 **Image Generated Successfully!**\n**Prompt:** {final_prompt}\n{image_url}"
+                )
 
         except Exception as e:
             error_msg = f"💀 Image generation failed: {str(e)}"

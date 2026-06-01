@@ -3126,12 +3126,25 @@ class JakeyBot(commands.Bot):
             # Ensure generated image URLs are included in the response
             # The AI sometimes forgets to include them, so we append any missing ones
             # Skip if the URL was already sent via discord_send_message tool
+            pollinations_image_urls = []
             if generated_image_urls:
                 tool_sent_text = " ".join(content for _, content in discord_sent_via_tool)
                 for url in generated_image_urls:
                     if url not in ai_response and url not in tool_sent_text:
                         ai_response = ai_response.rstrip() + "\n\n" + url
                         logger.info(f"📸 Appended missing image URL to response")
+
+            # Extract Pollinations image URLs and send as embeds for proper Discord rendering
+            if generated_image_urls:
+                import re as _re
+                pollinations_pattern = _re.compile(r'https?://image\.pollinations\.ai/prompt[^\s<>"]+', _re.IGNORECASE)
+                for url in generated_image_urls:
+                    if pollinations_pattern.match(url):
+                        if url in ai_response:
+                            ai_response = ai_response.replace(url, "").strip()
+                        pollinations_image_urls.append(url)
+
+                ai_response = "\n".join(line for line in ai_response.split("\n") if line.strip())
 
             # Send any generated audio files
             if generated_audio_files:
@@ -3222,6 +3235,18 @@ class JakeyBot(commands.Bot):
                     await message.channel.send(msg_text)
                     if i < len(messages_to_send) - 1:
                         await asyncio.sleep(0.5)  # Small delay between split messages
+
+            # Send Pollinations image URLs as embeds for proper Discord rendering
+            if pollinations_image_urls:
+                for img_url in pollinations_image_urls:
+                    try:
+                        embed = discord.Embed()
+                        embed.set_image(url=img_url)
+                        await message.channel.send(embed=embed)
+                        logger.info(f"📸 Sent image as embed: {img_url[:100]}...")
+                    except Exception as e:
+                        logger.error(f"Failed to send image embed, falling back to URL: {e}")
+                        await message.channel.send(img_url)
 
             # Multi-round: Send follow-up messages
             if followup_parts and MULTI_ROUND_ENABLED:
