@@ -32,18 +32,14 @@ class DiscordTools:
             channel = self.bot.get_channel(MOD_LOG_CHANNEL_ID)
             if not channel:
                 channel = await self.bot.fetch_channel(MOD_LOG_CHANNEL_ID)
-            embed = discord.Embed(
-                title=f"Moderation Action: {action.upper()}",
-                color=discord.Color.red() if action in ("ban", "kick") else discord.Color.orange(),
-                timestamp=datetime.utcnow(),
-            )
-            embed.add_field(name="User", value=user, inline=True)
-            embed.add_field(name="Guild", value=guild_name, inline=True)
+            msg = f"**Moderation Action: {action.upper()}**\n"
+            msg += f"**User:** {user}\n"
+            msg += f"**Guild:** {guild_name}\n"
             if duration:
-                embed.add_field(name="Duration", value=duration, inline=True)
-            embed.add_field(name="Reason", value=reason or "None provided", inline=False)
-            embed.set_footer(text=f"Action by {self.bot.user}")
-            await channel.send(embeds=[embed])
+                msg += f"**Duration:** {duration}\n"
+            msg += f"**Reason:** {reason or 'None provided'}\n"
+            msg += f"*Action by {self.bot.user}*"
+            await channel.send(msg)
         except Exception as e:
             logger.error(f"Failed to send mod notification: {e}")
 

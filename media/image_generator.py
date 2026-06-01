@@ -100,7 +100,7 @@ class ImageGenerator:
                 params["seed"] = seed
 
             encoded_prompt = urllib.parse.quote(prompt)
-            url = f"{POLLINATIONS_IMAGE_BASE}/{encoded_prompt}?{urllib.parse.urlencode(params)}"
+            url = f"{POLLINATIONS_IMAGE_BASE}/{encoded_prompt}.png?{urllib.parse.urlencode(params)}"
 
             resp = self.session.head(url, timeout=10)
             if resp.status_code < 500:
