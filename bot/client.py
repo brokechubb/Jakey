@@ -3123,15 +3123,18 @@ class JakeyBot(commands.Bot):
                         tool_sent_suppressed = True
                         break
 
-            # Ensure generated image URLs are included in the response
-            # The AI sometimes forgets to include them, so we append any missing ones
-            # Skip if the URL was already sent via discord_send_message tool
+            # Strip Pollinations image URLs from response text
+            # They'll be downloaded and sent as file attachments instead
+            pollinations_image_urls_to_send = []
             if generated_image_urls:
-                tool_sent_text = " ".join(content for _, content in discord_sent_via_tool)
+                import re as _re
+                pollinations_pattern = _re.compile(r'https?://image\.pollinations\.ai/prompt[^\s<>"]+', _re.IGNORECASE)
                 for url in generated_image_urls:
-                    if url not in ai_response and url not in tool_sent_text:
-                        ai_response = ai_response.rstrip() + "\n\n" + url
-                        logger.info(f"📸 Appended missing image URL to response")
+                    if url in ai_response:
+                        ai_response = ai_response.replace(url, "").strip()
+                    pollinations_image_urls_to_send.append(url)
+
+                ai_response = "\n".join(line for line in ai_response.split("\n") if line.strip())
 
             # Send any generated audio files
             if generated_audio_files:
@@ -3222,6 +3225,24 @@ class JakeyBot(commands.Bot):
                     await message.channel.send(msg_text)
                     if i < len(messages_to_send) - 1:
                         await asyncio.sleep(0.5)  # Small delay between split messages
+
+            # Download and send generated images as file attachments
+            if pollinations_image_urls_to_send:
+                import io as _io
+                async with aiohttp.ClientSession() as img_session:
+                    for img_url in pollinations_image_urls_to_send:
+                        try:
+                            async with img_session.get(img_url, timeout=aiohttp.ClientTimeout(total=30)) as resp:
+                                if resp.status == 200:
+                                    img_bytes = await resp.read()
+                                    await message.channel.send(file=discord.File(_io.BytesIO(img_bytes), filename="generated.png"))
+                                    logger.info(f"📸 Sent generated image as file attachment")
+                                else:
+                                    await message.channel.send(img_url)
+                                    logger.warning(f"📸 Image download failed ({resp.status}), sent URL instead")
+                        except Exception as e:
+                            logger.error(f"Failed to download/send image: {e}")
+                            await message.channel.send(img_url)
 
             # Multi-round: Send follow-up messages
             if followup_parts and MULTI_ROUND_ENABLED:

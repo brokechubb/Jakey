@@ -2583,9 +2583,30 @@ def setup_commands(bot):
                 pass
 
             # Send the final result
-            await ctx.send(
-                f"🎨 **Image Generated Successfully!**\n**Prompt:** {final_prompt}\n{image_url}"
-            )
+            if "image.pollinations.ai" in image_url:
+                import io as _io
+                import aiohttp as _aiohttp
+                try:
+                    async with _aiohttp.ClientSession() as session:
+                        async with session.get(image_url, timeout=_aiohttp.ClientTimeout(total=30)) as resp:
+                            if resp.status == 200:
+                                img_bytes = await resp.read()
+                                await ctx.send(
+                                    f"🎨 **Image Generated Successfully!**\n**Prompt:** {final_prompt}",
+                                    file=discord.File(_io.BytesIO(img_bytes), filename="generated.png"),
+                                )
+                            else:
+                                await ctx.send(
+                                    f"🎨 **Image Generated Successfully!**\n**Prompt:** {final_prompt}\n{image_url}"
+                                )
+                except Exception:
+                    await ctx.send(
+                        f"🎨 **Image Generated Successfully!**\n**Prompt:** {final_prompt}\n{image_url}"
+                    )
+            else:
+                await ctx.send(
+                    f"🎨 **Image Generated Successfully!**\n**Prompt:** {final_prompt}\n{image_url}"
+                )
 
         except Exception as e:
             error_msg = f"💀 Image generation failed: {str(e)}"
