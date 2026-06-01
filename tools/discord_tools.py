@@ -11,6 +11,9 @@ from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
+MOD_LOG_CHANNEL_ID = 1425626341658726511
+
+
 class DiscordTools:
     """Native Discord tools implementation for Jakey"""
 
@@ -23,6 +26,26 @@ class DiscordTools:
         self.bot = bot_client
         self._last_dm_time = 0
         self._dm_cooldown = 30  # 30 seconds between DMs
+
+    async def _send_mod_notification(self, action: str, user: str, guild_name: str, reason: str = "", duration: str = ""):
+        try:
+            channel = self.bot.get_channel(MOD_LOG_CHANNEL_ID)
+            if not channel:
+                channel = await self.bot.fetch_channel(MOD_LOG_CHANNEL_ID)
+            embed = discord.Embed(
+                title=f"Moderation Action: {action.upper()}",
+                color=discord.Color.red() if action in ("ban", "kick") else discord.Color.orange(),
+                timestamp=datetime.utcnow(),
+            )
+            embed.add_field(name="User", value=user, inline=True)
+            embed.add_field(name="Guild", value=guild_name, inline=True)
+            if duration:
+                embed.add_field(name="Duration", value=duration, inline=True)
+            embed.add_field(name="Reason", value=reason or "None provided", inline=False)
+            embed.set_footer(text=f"Action by {self.bot.user}")
+            await channel.send(embed=embed)
+        except Exception as e:
+            logger.error(f"Failed to send mod notification: {e}")
 
     def get_user_info(self) -> Dict[str, Any]:
         """Get information about the currently logged-in Discord user"""
@@ -679,10 +702,12 @@ class DiscordTools:
 
             try:
                 await member.kick(reason=reason)
+                user_str = f"{member.name}#{member.discriminator}"
+                asyncio.ensure_future(self._send_mod_notification("kick", user_str, guild.name, reason))
                 return {
                     "status": "success",
                     "action": "kick",
-                    "user": f"{member.name}#{member.discriminator}",
+                    "user": user_str,
                     "guild": guild.name,
                     "reason": reason
                 }
@@ -726,10 +751,12 @@ class DiscordTools:
 
                 await guild.ban(user, reason=reason, delete_message_days=min(7, max(0, int(delete_message_seconds / 86400))))
                 
+                user_str = f"{user.name}#{user.discriminator}"
+                asyncio.ensure_future(self._send_mod_notification("ban", user_str, guild.name, reason))
                 return {
                     "status": "success",
                     "action": "ban",
-                    "user": f"{user.name}#{user.discriminator}",
+                    "user": user_str,
                     "guild": guild.name,
                     "reason": reason
                 }
@@ -817,10 +844,13 @@ class DiscordTools:
                 else:
                     return {"error": "Timeout not supported by this library version or member object"}
 
+                user_str = f"{member.name}#{member.discriminator}"
+                duration_str = f"{duration_minutes} minutes" if duration_minutes > 0 else "Removed"
+                asyncio.ensure_future(self._send_mod_notification("timeout", user_str, guild.name, reason, duration_str))
                 return {
                     "status": "success",
                     "action": "timeout",
-                    "user": f"{member.name}#{member.discriminator}",
+                    "user": user_str,
                     "guild": guild.name,
                     "duration_minutes": duration_minutes,
                     "reason": reason
