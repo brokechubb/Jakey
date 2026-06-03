@@ -3123,16 +3123,14 @@ class JakeyBot(commands.Bot):
                         tool_sent_suppressed = True
                         break
 
-            # Strip Pollinations image URLs from response text
+            # Strip generated image URLs from response text
             # They'll be downloaded and sent as file attachments instead
-            pollinations_image_urls_to_send = []
+            image_urls_to_send = []
             if generated_image_urls:
-                import re as _re
-                pollinations_pattern = _re.compile(r'https?://image\.pollinations\.ai/prompt[^\s<>"]+', _re.IGNORECASE)
                 for url in generated_image_urls:
                     if url in ai_response:
                         ai_response = ai_response.replace(url, "").strip()
-                    pollinations_image_urls_to_send.append(url)
+                    image_urls_to_send.append(url)
 
                 ai_response = "\n".join(line for line in ai_response.split("\n") if line.strip())
 
@@ -3227,10 +3225,10 @@ class JakeyBot(commands.Bot):
                         await asyncio.sleep(0.5)  # Small delay between split messages
 
             # Download and send generated images as file attachments
-            if pollinations_image_urls_to_send:
+            if image_urls_to_send:
                 import io as _io
                 async with aiohttp.ClientSession() as img_session:
-                    for img_url in pollinations_image_urls_to_send:
+                    for img_url in image_urls_to_send:
                         try:
                             async with img_session.get(img_url, timeout=aiohttp.ClientTimeout(total=30)) as resp:
                                 if resp.status == 200:
@@ -4757,7 +4755,7 @@ class JakeyBot(commands.Bot):
 `%model [model_name]` - Show or set current AI model (admin)
 `%models` - List all available AI models
 `%imagemodels` - List all 49 artistic image styles
-`%aistatus` - Check Pollinations AI service status
+`%aistatus` - Check AI service status
 `%fallbackstatus` - Show OpenRouter fallback restoration status (admin)
 `%queuestatus` - Show message queue status and statistics (admin)
 `%processqueue` - Manually trigger queue processing (admin)
@@ -5601,7 +5599,7 @@ class JakeyBot(commands.Bot):
                 # Show available AI models
                 await self._safe_send_message(
                     channel,
-                    "**🤖 Available AI Models**\n\n**🎨 Image Models:**\n• **Pollinations** - Default image generation\n• **DALL-E** - High quality images\n• **Stable Diffusion** - Creative AI art\n\n**💬 Text Models:**\n• **Pollinations Chat** - Default chat model\n• **OpenRouter Models** - Premium chat models\n• **GPT-4** - Advanced reasoning\n• **Claude** - Helpful assistant\n\n**🔧 Use `%model <name>` to switch models**\n*Models may require specific permissions* 💀",
+                    "**🤖 Available AI Models**\n\n**🎨 Image Models:**\n• **Arta** - Default image generation (49 artistic styles)\n\n**💬 Text Models:**\n• **Local Models** - Default chat models\n• **OpenRouter Models** - Premium chat models\n\n**🔧 Use `%model <name>` to switch models**\n*Models may require specific permissions* 💀",
                 )
                 return True
 
@@ -6246,7 +6244,7 @@ class JakeyBot(commands.Bot):
                 # Show available image generation models
                 await self._safe_send_message(
                     channel,
-                    "**🎨 Available Image Models**\n\n**🔥 Popular Models:**\n• **Pollinations** - Default, fast generation\n• **DALL-E 3** - High quality, detailed\n• **Stable Diffusion XL** - Creative, artistic\n• **Midjourney** - Professional quality\n\n**🎭 Style Models:**\n• **Anime Style** - Japanese art style\n• **Realistic** - Photorealistic\n• **Fantasy Art** - Creative & imaginative\n• **Pixel Art** - Retro gaming style\n\n**💡 Use `%image <prompt>` to generate images**\n*Model selection available in premium tier* 💎",
+                    "**🎨 Available Image Styles**\n\n**🎭 49 Artistic Styles** via Arta API:\n• **Flux** - Default, versatile\n• **GPT4o** - High quality AI generation\n• **SDXL 1.0** - Stable Diffusion XL\n• **Fantasy Art** - Creative & imaginative\n• **Van Gogh, Picasso, Da Vinci** styles\n• **Anime & Cartoon** styles\n• **Watercolor, Oil, Charcoal** media\n• **Cute Cartoon, Clay, Pixel** special styles\n\n**💡 Use `%image <prompt>` to generate images**\n*Example: `%image Fantasy Art a wizard casting spells`* 💎",
                 )
                 return True
 

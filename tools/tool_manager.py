@@ -604,7 +604,7 @@ class ToolManager:
                 "type": "function",
                 "function": {
                     "name": "generate_image",
-                    "description": "Generate an image using Arta API (with Pollinations fallback). Choose a style that matches the user's request.",
+                    "description": "Generate an image using Arta API. Choose a style that matches the user's request.",
                     "parameters": {
                         "type": "object",
                         "properties": {
@@ -2050,7 +2050,7 @@ class ToolManager:
     def generate_image(
         self, prompt: str, style: str = "Flux", ratio: str = "1:1"
     ) -> str:
-        """Generate an image using Arta API with Pollinations fallback and rate limiting"""
+        """Generate an image using Arta API with rate limiting"""
         if not self._check_rate_limit("generate_image"):
             return "Rate limit exceeded. Please wait before generating another image."
 
